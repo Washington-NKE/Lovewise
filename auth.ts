@@ -5,9 +5,9 @@ import { prisma } from "./lib/prisma";
 
 declare module "next-auth" {
   interface User {
-    id: string;
+    id?: string;
     name?: string | null;
-    email: string;
+    email?: string | null;
   }
   
   interface Session {
