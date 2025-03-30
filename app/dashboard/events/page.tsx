@@ -15,7 +15,7 @@ import {
   SelectValue 
 } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Calendar, CalendarIcon, Clock, Plus, Heart, Star, Gift, Music, Film, ChevronRight } from 'lucide-react'
+import { Calendar, CalendarIcon, Clock, Plus, Heart, Star, Gift, Film, ChevronRight } from 'lucide-react'
 import { format } from "date-fns"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -95,10 +95,10 @@ export default function EventsPage() {
     }
   }
 
-  const cardVariants = {
-    hidden: { y: 20, opacity: 0 },
-    show: { y: 0, opacity: 1, transition: { duration: 0.4 } }
-  }
+  // const cardVariants = {
+  //   hidden: { y: 20, opacity: 0 },
+  //   show: { y: 0, opacity: 1, transition: { duration: 0.4 } }
+  // }
 
   const FloatingHearts = () => {
     return (
@@ -177,7 +177,7 @@ export default function EventsPage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="title" className="text-pink-600 dark:text-pink-300 font-medium">What's the Occasion?</Label>
+                <Label htmlFor="title" className="text-pink-600 dark:text-pink-300 font-medium">What&apos;s the Occasion?</Label>
                 <Input id="title" placeholder="Enter event title" className="border-pink-200 focus:border-pink-500 focus:ring-pink-500" />
               </div>
               <div className="grid gap-2">

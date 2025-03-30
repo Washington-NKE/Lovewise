@@ -32,17 +32,13 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { 
   Avatar, 
-  AvatarFallback, 
-  AvatarImage 
+  AvatarFallback 
 } from "@/components/ui/avatar";
 
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { 
-  Calendar, 
   Gift, 
-  Heart, 
-  Upload, 
-  Clock, 
+  Heart,  
   Star, 
   PlusCircle, 
   Edit, 
@@ -50,7 +46,6 @@ import {
   LockIcon, 
   Sparkles, 
   Camera, 
-  Calendar as CalendarIcon, 
   DollarSign,
   Flame
 } from 'lucide-react'
@@ -65,7 +60,7 @@ export default function GiftsPage() {
   }, [])
 
   // Mock data for demonstration
-  const [giftHistory, setGiftHistory] = useState([
+  const [giftHistory] = useState([
     {
       id: 1,
       giftName: "Silk Lingerie Set",
@@ -104,7 +99,7 @@ export default function GiftsPage() {
     }
   ])
 
-  const [wishlist, setWishlist] = useState([
+  const [wishlist] = useState([
     {
       id: 1,
       item: "Weekend Getaway",
@@ -131,7 +126,7 @@ export default function GiftsPage() {
     }
   ])
 
-  const [occasions, setOccasions] = useState([
+  const [occasions] = useState([
     {
       id: 1,
       title: "Anniversary",
@@ -150,7 +145,7 @@ export default function GiftsPage() {
     }
   ])
 
-  const [thoughtfulIdeas, setThoughtfulIdeas] = useState([
+  const [thoughtfulIdeas] = useState([
     {
       id: 1,
       title: "Memory Jar",

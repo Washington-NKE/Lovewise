@@ -19,7 +19,7 @@ import { Plus, Heart, Calendar, Lock, Bookmark, Eye, EyeOff, Sparkles } from 'lu
 import { motion } from "framer-motion"
 
 export default function JournalPage() {
-  const [hoveredCard, setHoveredCard] = useState(null);
+  const [hoveredCard, setHoveredCard] = useState<number | null>(null);
   
   const entries = [
     {
