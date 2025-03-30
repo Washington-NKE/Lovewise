@@ -1,13 +1,16 @@
+"use client"
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BookHeart, Calendar, Image, MessageSquareHeart, Plus, Sparkles, Flame } from 'lucide-react'
 import { format, differenceInDays } from "date-fns"
 import { motion } from "framer-motion"
-import { getDashboardData } from "./DashboardDataProvider"
+import { useDashboardData } from "./DashboardDataContext"
 
-export default async function DashboardContent() {
-  const data = await getDashboardData();
+export default function DashboardContent() {
+  const data = useDashboardData();
+                      
   
   const fadeInUp = {
     initial: { opacity: 0, y: 20 },

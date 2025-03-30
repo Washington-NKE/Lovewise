@@ -1,4 +1,4 @@
-import { auth } from "@/auth"
+// DashboardDataProvider.tsx
 import { prisma } from "@/lib/prisma"
 import { cache } from 'react'
 
@@ -21,11 +21,9 @@ export interface DashboardData {
   unreadMessages: number;
 }
 
-// Cached and memoized data fetching function
-export const getDashboardData = cache(async (): Promise<DashboardData> => {
-  const session = await auth();
-
-  if (!session?.user?.id) {
+// This function still uses cache but only takes the userId directly
+export const fetchDashboardData = cache(async (userId: string): Promise<DashboardData> => {
+  if (!userId) {
     return {
       journalEntries: [],
       memories: [],
@@ -35,10 +33,9 @@ export const getDashboardData = cache(async (): Promise<DashboardData> => {
   }
 
   try {
-    // Use a single query with multiple conditions for better performance
     const [dashboardData] = await prisma.$transaction([
       prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { id: userId },
         select: {
           journals: {
             take: 3,
@@ -57,13 +54,13 @@ export const getDashboardData = cache(async (): Promise<DashboardData> => {
             select: { id: true, title: true, startDate: true }
           },
           _count: {
-            select: { 
-              messages: { 
-                where: { 
-                  receiverId: session.user.id, 
-                  isRead: false 
-                } 
-              } 
+            select: {
+              messages: {
+                where: {
+                  receiverId: userId,
+                  isRead: false
+                }
+              }
             }
           }
         }
