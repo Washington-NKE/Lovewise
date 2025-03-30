@@ -15,8 +15,8 @@ import {
   SelectValue 
 } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Calendar, Heart, Plus, Camera, Star, Bookmark, Clock, Film, Image, Sparkles } from 'lucide-react'
-import { motion, AnimatePresence } from "framer-motion"
+import {  Heart, Plus, Camera, Star, Bookmark, Clock, Film, Image, Sparkles } from 'lucide-react'
+import { motion } from "framer-motion"
 
 export default function MemoriesPage() {
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
@@ -98,10 +98,10 @@ export default function MemoriesPage() {
     }
   };
 
-  const cardVariants = {
-    hidden: { y: 20, opacity: 0 },
-    show: { y: 0, opacity: 1, transition: { duration: 0.4 } }
-  };
+  // const cardVariants = {
+  //   hidden: { y: 20, opacity: 0 },
+  //   show: { y: 0, opacity: 1, transition: { duration: 0.4 } }
+  // };
 
   const heartBeat = {
     rest: { scale: 1 },
