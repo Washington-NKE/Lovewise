@@ -51,7 +51,7 @@ export default function DashboardContent() {
 
   return (
     <div className="space-y-8 bg-gradient-to-br from-rose-50 to-purple-50 p-6 rounded-xl">
-      <motion.div 
+      {/* <motion.div 
         className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
         variants={staggerContainer}
         initial="initial"
@@ -181,7 +181,7 @@ export default function DashboardContent() {
             </CardContent>
           </Card>
         </motion.div>
-      </motion.div>
+      </motion.div> */}
 
       <motion.div 
         className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"

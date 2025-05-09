@@ -277,7 +277,7 @@ export const LoveJournalSidebar: React.FC<LoveJournalSidebarProps> = ({ session 
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
+            {/* <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === "/dashboard/events"} className="hover:bg-purple-100/50 transition-all">
                 <Link href="/dashboard/events" className="group">
                   <motion.div whileHover={{ rotate: 5 }} className="flex items-center">
@@ -324,7 +324,7 @@ export const LoveJournalSidebar: React.FC<LoveJournalSidebarProps> = ({ session 
                   </motion.div>
                 </Link>
               </SidebarMenuButton>
-            </SidebarMenuItem>
+            </SidebarMenuItem> */}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="border-t border-rose-200 p-4 bg-gradient-to-b from-rose-50 to-rose-100/50">

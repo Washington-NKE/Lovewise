@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Heart, Calendar, MessageSquare, Camera, Star, ChevronRight } from 'lucide-react'
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { useState, useEffect } from "react"
+import { redirect } from "next/navigation"
 
 export default function Home() {
+  redirect('/dashboard');
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
