@@ -213,7 +213,7 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <Heart className="h-5 w-5 text-rose-500" />
             <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
-              © 2025 Lovewise. All rights reserved.
+              © {new Date().getFullYear()} Washington Mwangi. All rights reserved.
             </p>
           </div>
           <div className="flex items-center gap-4">

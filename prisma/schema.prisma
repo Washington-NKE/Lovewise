@@ -2,211 +2,359 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider = "prisma-client-js"
-  }
-  
-  datasource db {
-    provider = "mysql"
-    url      = env("DATABASE_URL")
-  }
-  
-  model User {
-    id             String    @id @default(uuid())
-    email          String    @unique
-    password       String
-    name           String
-    profileImage   String?
-    createdAt      DateTime  @default(now())
-    updatedAt      DateTime  @updatedAt
-    role           String    @default("USER")
-  
-    relationships  Relationship[]   @relation("UserRelationships")
-    partnerRelationships Relationship[] @relation("PartnerRelationships")
-    events         Event[]          @relation("EventCreator")
-    journals       Journal[]
-    messages       Message[]        @relation("MessageSender")
-    receivedMessages Message[]      @relation("MessageReceiver")
-    memories       Memory[]         @relation("MemoryCreator")
-    quizzes        Quiz[]           @relation("QuizCreator")
-    quizResponses  QuizResponse[]
+  provider = "prisma-client-js"
+}
 
-    @@index([role])
-  }
-  
-  model Relationship {
-    id             String    @id @default(uuid())
-    createdAt      DateTime  @default(now())
-    updatedAt      DateTime  @updatedAt
-    status         String    @default("PENDING") // PENDING, ACTIVE, ENDED
-    anniversaryDate DateTime?
-    
-    userId         String
-    user           User      @relation("UserRelationships", fields: [userId], references: [id], onDelete: Cascade)
-    
-    partnerId      String
-    partner        User      @relation("PartnerRelationships", fields: [partnerId], references: [id], onDelete: Cascade)
-    
-    events         Event[]
-    journals       Journal[]
-    memories       Memory[]
-    quizzes        Quiz[]
-  
-    @@unique([userId, partnerId])
-    @@index([userId])
-    @@index([partnerId])
-  }
-  
-  model Event {
-    id             String    @id @default(uuid())
-    title          String
-    description    String?   @db.Text
-    location       String?
-    startDate      DateTime
-    endDate        DateTime?
-    isAllDay       Boolean   @default(false)
-    reminderTime   DateTime?
-    createdAt      DateTime  @default(now())
-    updatedAt      DateTime  @updatedAt
-    
-    creatorId      String
-    creator        User      @relation("EventCreator", fields: [creatorId], references: [id], onDelete: Cascade)
-    
-    relationshipId String
-    relationship   Relationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
-  
-    @@index([creatorId])
-    @@index([relationshipId])
-  }
-  
-  model Journal {
-    id             String    @id @default(uuid())
-    title          String
-    content        String    @db.Text
-    mood           String?
-    isPrivate      Boolean   @default(false)
-    createdAt      DateTime  @default(now())
-    updatedAt      DateTime  @updatedAt
-    
-    userId         String
-    user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-    
-    relationshipId String
-    relationship   Relationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
-  
-    @@index([userId])
-    @@index([relationshipId])
-  }
-  
-  model Message {
-    id             String    @id @default(uuid())
-    content        String    @db.Text
-    isRead         Boolean   @default(false)
-    createdAt      DateTime  @default(now())
-    
-    senderId       String
-    sender         User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-    
-    receiverId     String
-    receiver       User      @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
-  
-    @@index([senderId])
-    @@index([receiverId])
-  }
-  
-  model Memory {
-    id             String    @id @default(uuid())
-    title          String
-    description    String    @db.Text
-    date           DateTime
-    location       String?
-    mediaUrls      Json?     // Store array of image/video URLs
-    createdAt      DateTime  @default(now())
-    updatedAt      DateTime  @updatedAt
-    
-    creatorId      String
-    creator        User      @relation("MemoryCreator", fields: [creatorId], references: [id], onDelete: Cascade)
-    
-    relationshipId String
-    relationship   Relationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
-  
-    @@index([creatorId])
-    @@index([relationshipId])
-  }
-  
-  model Quiz {
-    id             String    @id @default(uuid())
-    title          String
-    description    String?   @db.Text
-    createdAt      DateTime  @default(now())
-    updatedAt      DateTime  @updatedAt
-    
-    creatorId      String
-    creator        User      @relation("QuizCreator", fields: [creatorId], references: [id], onDelete: Cascade)
-    
-    relationshipId String
-    relationship   Relationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
-    
-    questions      Question[]
-    responses      QuizResponse[]
-  
-    @@index([creatorId])
-    @@index([relationshipId])
-  }
-  
-  model Question {
-    id             String    @id @default(uuid())
-    content        String    @db.Text
-    questionType   String    @default("OPEN_ENDED") // OPEN_ENDED, MULTIPLE_CHOICE, TRUE_FALSE
-    options        Json?     // For multiple choice questions
-    correctAnswer  String?   // Optional correct answer for knowledge-based questions
-    createdAt      DateTime  @default(now())
-    
-    quizId         String
-    quiz           Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
-    
-    responses      QuestionResponse[]
-  
-    @@index([quizId])
-  }
-  
-  model QuizResponse {
-    id             String    @id @default(uuid())
-    score          Int?
-    completedAt    DateTime  @default(now())
-    
-    userId         String
-    user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-    
-    quizId         String
-    quiz           Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
-    
-    questionResponses QuestionResponse[]
-  
-    @@index([userId])
-    @@index([quizId])
-  }
-  
-  model QuestionResponse {
-    id             String    @id @default(uuid())
-    answer         String    @db.Text
-    
-    questionId     String
-    question       Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
-    
-    quizResponseId String
-    quizResponse   QuizResponse @relation(fields: [quizResponseId], references: [id], onDelete: Cascade)
-  
-    @@index([questionId])
-    @@index([quizResponseId])
-  }
-  
-  model Settings {
-    id               String    @id @default(uuid())
-    theme            String    @default("light")
-    notifications    Boolean   @default(true)
-    relationshipId   String    @unique
-    createdAt        DateTime  @default(now())
-    updatedAt        DateTime  @updatedAt
-  
-    @@index([relationshipId])
-  }
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  password        String
+  name            String
+  bio             String?
+  dob             String?
+  gender          String?
+  phone           String?
+  provider        String?
+  providerId      String?
+  lastActive      DateTime?
+  favouriteColour String?
+  timezone        String?
+  loveLanguage    String?
+  profileImage    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  role            String    @default("USER")
+  lovePact        LovePact? @relation(fields: [lovePactId], references: [id])
+  lovePactId      String?
+
+  // Notification preferences
+  emailNotifications           Boolean @default(true)
+  pushNotifications            Boolean @default(true)
+  eventReminders               Boolean @default(true)
+  partnerActivityNotifications Boolean @default(true)
+
+  // Privacy settings
+  privateJournalDefault Boolean @default(false)
+
+  relationships        Relationship[]    @relation("UserRelationships")
+  partnerRelationships Relationship[]    @relation("PartnerRelationships")
+  events               Event[]           @relation("EventCreator")
+  journals             Journal[]
+  messages             Message[]         @relation("MessageSender")
+  receivedMessages     Message[]         @relation("MessageReceiver")
+  memories             Memory[]          @relation("MemoryCreator")
+  quizzes              Quiz[]            @relation("QuizCreator")
+  quizResponses        QuizResponse[]
+  giftsGiven           Gift[]            @relation("GiftsGiven")
+  giftsReceived        Gift[]            @relation("GiftsReceived")
+  wishlistItems        WishlistItem[]
+  specialOccasions     SpecialOccasion[]
+  userSettings         UserSettings?
+
+  @@index([role])
+}
+
+model LovePact {
+  id                 String   @id @default(cuid())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  title              String
+  content            String
+  declaration        String
+  partnerDeclaration String
+  signatures         Json // Stores both partners' signatures
+  isActive           Boolean  @default(true)
+  user               User[]
+}
+
+model UserSettings {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  theme             String   @default("light")
+  language          String   @default("en")
+  fontSize          Int      @default(16)
+  enableDarkMode    Boolean  @default(false)
+  notificationSound Boolean  @default(true)
+  emailDigests      Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Relationship {
+  id              String    @id @default(uuid())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  status          String    @default("PENDING") // PENDING, ACTIVE, ENDED
+  anniversaryDate DateTime?
+
+  userId String
+  user   User   @relation("UserRelationships", fields: [userId], references: [id], onDelete: Cascade)
+
+  partnerId String
+  partner   User   @relation("PartnerRelationships", fields: [partnerId], references: [id], onDelete: Cascade)
+
+  events           Event[]
+  journals         Journal[]
+  memories         Memory[]
+  quizzes          Quiz[]
+  gifts            Gift[]
+  wishlistItems    WishlistItem[]
+  specialOccasions SpecialOccasion[]
+
+  @@unique([userId, partnerId])
+  @@index([userId])
+  @@index([partnerId])
+}
+
+model Gift {
+  id             String       @id @default(uuid())
+  name           String
+  description    String?
+  dateGiven      DateTime?
+  occasion       String?
+  type           GiftType     @default(PHYSICAL)
+  status         GiftStatus   @default(GIVEN)
+  price          Float?
+  currency       String?      @default("USD")
+  isSurprise     Boolean      @default(false)
+  surpriseLevel  Int?         @default(50)
+  isFavorite     Boolean      @default(false)
+  imageUrl       String?
+  giverId        String
+  giver          User         @relation("GiftsGiven", fields: [giverId], references: [id])
+  recipientId    String
+  recipient      User         @relation("GiftsReceived", fields: [recipientId], references: [id])
+  relationshipId String
+  relationship   Relationship @relation(fields: [relationshipId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  reaction       String?
+  notes          String?
+
+  @@index([giverId])
+  @@index([recipientId])
+  @@index([relationshipId])
+}
+
+model WishlistItem {
+  id             String       @id @default(uuid())
+  name           String
+  description    String?
+  priority       Priority     @default(MEDIUM)
+  isSecret       Boolean      @default(false)
+  priceEstimate  Float?
+  url            String?
+  imageUrl       String?
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  relationshipId String
+  relationship   Relationship @relation(fields: [relationshipId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([relationshipId])
+}
+
+model SpecialOccasion {
+  id             String       @id @default(uuid())
+  title          String
+  date           DateTime
+  description    String?
+  budget         Float?
+  isRecurring    Boolean      @default(false)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  relationshipId String
+  relationship   Relationship @relation(fields: [relationshipId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  giftIdeas      String[] // Array of gift idea strings
+
+  @@index([userId])
+  @@index([relationshipId])
+}
+
+enum GiftType {
+  PHYSICAL
+  EXPERIENCE
+  DIGITAL
+  FINANCIAL
+  DIY
+}
+
+enum GiftStatus {
+  PLANNED
+  PURCHASED
+  GIVEN
+  RETURNED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Event {
+  id           String    @id @default(uuid())
+  title        String
+  description  String?   @db.Text
+  location     String?
+  startDate    DateTime
+  endDate      DateTime?
+  isAllDay     Boolean   @default(false)
+  reminderTime DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  creatorId String
+  creator   User   @relation("EventCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  relationshipId String
+  relationship   Relationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId])
+  @@index([relationshipId])
+}
+
+model Journal {
+  id        String   @id @default(uuid())
+  title     String
+  content   String   @db.Text
+  mood      String?
+  isPrivate Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  relationshipId String
+  relationship   Relationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([relationshipId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  senderId String
+  sender   User   @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  receiverId String
+  receiver   User   @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+model Memory {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @db.Text
+  date        DateTime
+  location    String?
+  mediaUrls   Json? // Store array of image/video URLs
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creatorId String
+  creator   User   @relation("MemoryCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  relationshipId String
+  relationship   Relationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId])
+  @@index([relationshipId])
+}
+
+model Quiz {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creatorId String
+  creator   User   @relation("QuizCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  relationshipId String
+  relationship   Relationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+
+  questions Question[]
+  responses QuizResponse[]
+
+  @@index([creatorId])
+  @@index([relationshipId])
+}
+
+model Question {
+  id            String   @id @default(uuid())
+  content       String   @db.Text
+  questionType  String   @default("OPEN_ENDED") // OPEN_ENDED, MULTIPLE_CHOICE, TRUE_FALSE
+  options       Json? // For multiple choice questions
+  correctAnswer String? // Optional correct answer for knowledge-based questions
+  createdAt     DateTime @default(now())
+
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  responses QuestionResponse[]
+
+  @@index([quizId])
+}
+
+model QuizResponse {
+  id          String   @id @default(uuid())
+  score       Int?
+  completedAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  questionResponses QuestionResponse[]
+
+  @@index([userId])
+  @@index([quizId])
+}
+
+model QuestionResponse {
+  id     String @id @default(uuid())
+  answer String @db.Text
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  quizResponseId String
+  quizResponse   QuizResponse @relation(fields: [quizResponseId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@index([quizResponseId])
+}
+
+model Settings {
+  id             String   @id @default(uuid())
+  theme          String   @default("light")
+  notifications  Boolean  @default(true)
+  relationshipId String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([relationshipId])
+}

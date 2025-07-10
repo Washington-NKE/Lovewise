@@ -1,11 +1,10 @@
 // app/dashboard/page.tsx
-import { auth } from "@/auth"
+import { auth } from "@/lib/auth"
 import { DashboardDataProvider } from "@/components/DashboardDataContext"
 import { fetchDashboardData } from "@/components/DashboardDataProvider"
 import DashboardContent from "@/components/DashboardContent"
 
 export default async function DashboardPage() {
-  // Auth call happens here in a proper Server Component context
   const session = await auth();
   
   // Fetch data based on session

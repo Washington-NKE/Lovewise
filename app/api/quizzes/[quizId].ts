@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
-import { auth } from '@/auth';
+import { auth } from '@/lib/auth';
 
 export default async function handler(
   req: NextApiRequest,
