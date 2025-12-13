@@ -5,33 +5,41 @@ import { prisma } from '@/lib/prisma'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
     
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { id } = await params
     const body = await request.json()
     const { name, description, priority, isSecret, priceEstimate, url, imageUrl } = body
 
-    // Verify ownership
     const existingItem = await prisma.wishlistItem.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!existingItem) {
       return NextResponse.json({ error: 'Wishlist item not found' }, { status: 404 })
     }
 
-    if (existingItem.userId !== session.user.id) {
+    if (existingItem.userId !== currentUser.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const wishlistItem = await prisma.wishlistItem.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name,
         priority,
@@ -52,30 +60,39 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
     
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Verify ownership
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { id } = await params
+
     const existingItem = await prisma.wishlistItem.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!existingItem) {
       return NextResponse.json({ error: 'Wishlist item not found' }, { status: 404 })
     }
 
-    if (existingItem.userId !== session.user.id) {
+    if (existingItem.userId !== currentUser.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     await prisma.wishlistItem.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json({ message: 'Wishlist item deleted successfully' })

@@ -1,28 +1,32 @@
 // app/api/messages/[id]/read/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
 import { auth } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { NextRequest, NextResponse } from 'next/server'
 
-const prisma = new PrismaClient()
-
-// PATCH /api/messages/[id]/read - Mark message as read
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const messageId = params.id
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
 
-    // Find the message and verify user is the receiver
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { id: messageId } = await params
+
     const message = await prisma.message.findFirst({
       where: {
         id: messageId,
-        receiverId: session.user.id
+        receiverId: currentUser.id
       }
     })
 
@@ -30,7 +34,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'Message not found' }, { status: 404 })
     }
 
-    // Update message to mark as read
     const updatedMessage = await prisma.message.update({
       where: { id: messageId },
       data: { isRead: true }

@@ -5,33 +5,41 @@ import { prisma } from '@/lib/prisma'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
     
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { id } = await params
     const body = await request.json()
     const { title, date, budget, description, isRecurring, giftIdeas } = body
 
-    // Verify ownership
     const existingOccasion = await prisma.specialOccasion.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!existingOccasion) {
       return NextResponse.json({ error: 'Occasion not found' }, { status: 404 })
     }
 
-    if (existingOccasion.userId !== session.user.id) {
+    if (existingOccasion.userId !== currentUser.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const occasion = await prisma.specialOccasion.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         title,
         date,
@@ -51,30 +59,39 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
     
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Verify ownership
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { id } = await params
+
     const existingOccasion = await prisma.specialOccasion.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!existingOccasion) {
       return NextResponse.json({ error: 'Occasion not found' }, { status: 404 })
     }
 
-    if (existingOccasion.userId !== session.user.id) {
+    if (existingOccasion.userId !== currentUser.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     await prisma.specialOccasion.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json({ message: 'Occasion deleted successfully' })

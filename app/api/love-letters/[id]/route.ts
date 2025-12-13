@@ -1,27 +1,36 @@
-
 // PUT /api/love-letters/[id]
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-// Update a love letter
-export async function PUT(request: NextRequest, {params}: {params: {id: string}}) {
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const session = await auth()
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id } = params
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { id } = await params
     const body = await request.json()
     const { content, title, private: isPrivate, delivered } = body
 
-    // Verify ownership
     const existingLetter = await prisma.loveLetter.findUnique({
       where: { id },
       select: { userId: true }
     })
 
-    if (!existingLetter || existingLetter.userId !== session.user.id) {
+    if (!existingLetter || existingLetter.userId !== currentUser.id) {
       return NextResponse.json({ error: 'Love letter not found' }, { status: 404 })
     }
 
@@ -42,24 +51,32 @@ export async function PUT(request: NextRequest, {params}: {params: {id: string}}
   }
 }
 
-// DELETE /api/love-letters/[id]
-// Delete a love letter
-export async function DELETE({params}: { params: {id: string} }) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const session = await auth()
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id } = params
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
 
-    // Verify ownership
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { id } = await params
+
     const existingLetter = await prisma.loveLetter.findUnique({
       where: { id },
       select: { userId: true }
     })
 
-    if (!existingLetter || existingLetter.userId !== session.user.id) {
+    if (!existingLetter || existingLetter.userId !== currentUser.id) {
       return NextResponse.json({ error: 'Love letter not found' }, { status: 404 })
     }
 

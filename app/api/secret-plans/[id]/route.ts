@@ -2,25 +2,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-// Update a secret plan
-export async function PUT(request:NextRequest, { params }:{params: {id: string}}) {
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const session = await auth()
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id } = params
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { id } = await params
     const body = await request.json()
     const { title, description, budget, targetDate, progress } = body
 
-    // Verify ownership
     const existingPlan = await prisma.secretPlan.findUnique({
       where: { id },
       select: { userId: true }
     })
 
-    if (!existingPlan || existingPlan.userId !== session.user.id) {
+    if (!existingPlan || existingPlan.userId !== currentUser.id) {
       return NextResponse.json({ error: 'Secret plan not found' }, { status: 404 })
     }
 
@@ -44,31 +54,39 @@ export async function PUT(request:NextRequest, { params }:{params: {id: string}}
 
 // DELETE /api/secret-plans/[id]
 // Delete a secret plan
-export async function DELETE( { params }: {params: {id: string}}) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const session = await auth()
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id } = params
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
 
-    // Verify ownership
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { id } = await params
+
     const existingPlan = await prisma.secretPlan.findUnique({
       where: { id },
       select: { userId: true }
     })
 
-    if (!existingPlan || existingPlan.userId !== session.user.id) {
+    if (!existingPlan || existingPlan.userId !== currentUser.id) {
       return NextResponse.json({ error: 'Secret plan not found' }, { status: 404 })
     }
 
-    // Delete related items first
     await prisma.secretPlanItem.deleteMany({
       where: { secretPlanId: id }
     })
 
-    // Delete the plan
     await prisma.secretPlan.delete({
       where: { id }
     })
