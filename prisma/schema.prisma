@@ -42,6 +42,7 @@ model User {
   privateJournalDefault Boolean @default(false)
 
   relationships        Relationship[]    @relation("UserRelationships")
+
   partnerRelationships Relationship[]    @relation("PartnerRelationships")
   events               Event[]           @relation("EventCreator")
   journals             Journal[]
@@ -54,7 +55,12 @@ model User {
   giftsReceived        Gift[]            @relation("GiftsReceived")
   wishlistItems        WishlistItem[]
   specialOccasions     SpecialOccasion[]
+  thoughtfulIdeas      ThoughtfulIdea[]
+  secretPlans          SecretPlan[]
+  loveLetters          LoveLetter[]
   userSettings         UserSettings?
+  initiatedGameSessions GameSession[] @relation("Initiator")
+  joinedGameSessions    GameSession[] @relation("Opponent")
 
   @@index([role])
 }
@@ -148,7 +154,7 @@ model WishlistItem {
   id             String       @id @default(uuid())
   name           String
   description    String?
-  priority       Priority     @default(MEDIUM)
+  priority       Priority     @default(WOULD_LOVE)
   isSecret       Boolean      @default(false)
   priceEstimate  Float?
   url            String?
@@ -183,6 +189,76 @@ model SpecialOccasion {
   @@index([relationshipId])
 }
 
+model ThoughtfulIdea {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  type        IdeaType @default(DIY)
+  progress    Int      @default(0) // 0-100
+  targetDate  DateTime?
+  completed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("thoughtful_ideas")
+}
+
+model SecretPlan {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  progress    Int      @default(0) // 0-100
+  budget      Decimal? @db.Decimal(10, 2)
+  targetDate  DateTime?
+  items       SecretPlanItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("secret_plans")
+}
+
+
+model SecretPlanItem {
+  id          String  @id @default(cuid())
+  secretPlanId  String
+  item        String
+  completed   Boolean @default(false)
+  cost        Decimal? @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  planId String
+  plan   SecretPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@map("secret_plan_items")
+}
+
+model LoveLetter {
+  id        String   @id @default(cuid())
+  content   String
+  title     String?
+  private   Boolean  @default(false)
+  delivered Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("love_letters")
+}
+
 enum GiftType {
   PHYSICAL
   EXPERIENCE
@@ -199,9 +275,31 @@ enum GiftStatus {
 }
 
 enum Priority {
-  LOW
-  MEDIUM
-  HIGH
+  MUST_HAVE
+  WOULD_LOVE
+  NICE_TO_HAVE
+}
+
+enum IdeaType {
+  DIY
+  EXPERIENCE
+  INTIMATE
+  PERSONALIZED
+}
+
+enum GameStatus {
+  pending
+  in_progress
+  completed
+  canceled
+}
+
+enum PromptType {
+  truth
+  dare
+  flirty
+  romantic
+  deep
 }
 
 model Event {
@@ -211,6 +309,8 @@ model Event {
   location     String?
   startDate    DateTime
   endDate      DateTime?
+  time         String?
+  type         String?
   isAllDay     Boolean   @default(false)
   reminderTime DateTime?
   createdAt    DateTime  @default(now())
@@ -250,6 +350,7 @@ model Message {
   content   String   @db.Text
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+  attachments Json?  
 
   senderId String
   sender   User   @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
@@ -268,6 +369,9 @@ model Memory {
   date        DateTime
   location    String?
   mediaUrls   Json? // Store array of image/video URLs
+  album       String?
+  isFavorite  Boolean @default(false)
+  isSaved     Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -357,4 +461,44 @@ model Settings {
   updatedAt      DateTime @updatedAt
 
   @@index([relationshipId])
+}
+
+model Game {
+  id        Int   @id @default(autoincrement())
+  title     String  @unique
+  slug      String  @unique
+  description String?
+  maxPlayers  Int   @default(2)
+  rules     String?
+
+  sessions    GameSession[]
+  prompt      GamePrompt[]
+}
+
+model GameSession{
+  id          String  @id @default(cuid())
+  gameId      Int
+
+  initiatorId  String
+  opponentId   String?
+
+  status       GameStatus   @default(pending)
+  winnerId     String?
+  score        Int?
+  gameState    Json?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  game          Game  @relation(fields: [gameId], references: [id])
+  initiator   User  @relation("Initiator", fields: [initiatorId], references: [id])
+  opponent    User?  @relation("Opponent", fields: [opponentId], references: [id])
+}
+
+model GamePrompt  {
+  id            String    @id   @default(uuid())
+  gameId        Int
+  type          PromptType
+  content       String
+  game          Game      @relation(fields: [gameId], references: [id])
 }

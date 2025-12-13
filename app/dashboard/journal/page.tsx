@@ -16,22 +16,37 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { toast} from 'sonner'
-import { Plus, Heart, Calendar, Lock, Bookmark, Eye, EyeOff, Sparkles, Loader2, Trash, MoreVertical, Edit } from 'lucide-react'
-import { motion } from "framer-motion"
+import { Plus, Heart, Calendar, Lock, Bookmark, Eye, EyeOff, Sparkles, Loader2, Trash, MoreVertical, Edit, X } from 'lucide-react'
+import { motion, AnimatePresence } from "framer-motion"
 import { 
   getJournalEntries, 
   getSharedJournalEntries, 
   getPrivateJournalEntries, 
   createJournalEntry,
+  updateJournalEntry,
+  deleteJournalEntry,
   type JournalEntry as DbJournalEntry 
 } from "@/database/db"
 import { useSession } from "next-auth/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from "@/components/ui/alert-dialog"
 
 // Enhanced JournalEntry interface with UI properties
 interface JournalEntry extends DbJournalEntry {
   emoji: string;
   bgColor: string;
+  isLiked?: boolean;
+  likeCount?: number;
 }
 
 // Utility function to get emoji based on mood/content
@@ -111,7 +126,9 @@ function transformDbEntryToUiEntry(dbEntry: DbJournalEntry): JournalEntry {
   return {
     ...dbEntry,
     emoji: getEmojiForEntry(dbEntry.mood, dbEntry.content),
-    bgColor: getBgColorForEntry(dbEntry.mood, dbEntry.createdAt)
+    bgColor: getBgColorForEntry(dbEntry.mood, dbEntry.createdAt),
+    isLiked: false, // You can implement this with a separate likes table
+    likeCount: 0
   };
 }
 
@@ -121,6 +138,11 @@ export default function JournalPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  const [showEntryModal, setShowEntryModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
+  const [showEditForm, setShowEditForm] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -132,7 +154,7 @@ export default function JournalPage() {
   const loadEntries = async (filter: 'all' | 'shared' | 'private' = 'all') => {
     try {
       setLoading(true);
-      let dbEntries: JournalEntry[] = [];
+      let dbEntries: DbJournalEntry[] = [];
       
       switch (filter) {
         case 'shared':
@@ -149,12 +171,7 @@ export default function JournalPage() {
       setEntries(transformedEntries);
     } catch (error) {
       console.error('Error loading entries:', error);
-      toast(
-        <div>
-          <strong>Error</strong>
-          <div>Failed to load journal entries</div>
-        </div>
-      );
+      toast.error('Failed to load journal entries');
     } finally {
       setLoading(false);
     }
@@ -162,19 +179,14 @@ export default function JournalPage() {
 
   // Load all entries on component mount
   useEffect(() => {
-    loadEntries('all');
-  }, []);
+    loadEntries(activeTab as 'all' | 'shared' | 'private');
+  }, [activeTab]);
 
-  // Handle form submission
+  // Handle form submission for creating new entries
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim() || !formData.content.trim()) {
-      toast(
-        <div>
-          <strong>Error</strong>
-          <div>Please fill in both title and content</div>
-        </div>
-      );
+      toast.error('Please fill in both title and content');
       return;
     }
 
@@ -191,24 +203,83 @@ export default function JournalPage() {
       });
       
       // Reload entries
-      await loadEntries('all');
-      toast(
-        <div>
-          <strong>Success</strong>
-          <div>Journal entry created successfully!</div>
-        </div>
-      );
+      await loadEntries(activeTab as 'all' | 'shared' | 'private');
+      toast.success('Journal entry created successfully!');
       setShowCreateForm(false);
     } catch (error) {
-      toast(
-        <div>
-          <strong>Error</strong>
-          <div>Failed to create journal entry</div>
-        </div>
-      );
+      toast.error('Failed to create journal entry');
     } finally {
       setCreating(false);
     }
+  };
+
+  // Handle editing an entry
+  const handleEdit = (entry: JournalEntry) => {
+    setEditingEntry(entry);
+    setFormData({
+      title: entry.title,
+      content: entry.content,
+      mood: entry.mood || '',
+      isPrivate: entry.isPrivate
+    });
+    setShowEditForm(true);
+  };
+
+  // Handle updating an entry
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEntry || !formData.title.trim() || !formData.content.trim()) {
+      toast.error('Please fill in both title and content');
+      return;
+    }
+
+    try {
+      setCreating(true);
+      await updateJournalEntry(editingEntry.id, formData);
+      
+      // Reload entries
+      await loadEntries(activeTab as 'all' | 'shared' | 'private');
+      toast.success('Journal entry updated successfully!');
+      setShowEditForm(false);
+      setEditingEntry(null);
+    } catch (error) {
+      toast.error('Failed to update journal entry');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Handle deleting an entry
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteJournalEntry(id);
+      await loadEntries(activeTab as 'all' | 'shared' | 'private');
+      toast.success('Journal entry deleted successfully!');
+    } catch (error) {
+      toast.error('Failed to delete journal entry');
+    }
+  };
+
+  // Handle liking an entry
+  const handleLike = (entryId: string) => {
+    setEntries(prev => prev.map(entry => 
+      entry.id === entryId 
+        ? { 
+            ...entry, 
+            isLiked: !entry.isLiked,
+            likeCount: entry.isLiked ? (entry.likeCount || 0) - 1 : (entry.likeCount || 0) + 1
+          }
+        : entry
+    ));
+    
+    // Here you would typically save the like status to your database
+    toast.success('Like status updated!');
+  };
+
+  // Handle "Relive This Moment" button
+  const handleReliveThisMoment = (entry: JournalEntry) => {
+    setSelectedEntry(entry);
+    setShowEntryModal(true);
   };
 
   const fadeIn = {
@@ -239,7 +310,7 @@ export default function JournalPage() {
           </motion.div>
           <h2 className="text-3xl font-bold tracking-tight">Our Love Journal</h2>
         </div>
-          <Button 
+        <Button 
           onClick={() => setShowCreateForm(true)}
           className="bg-white text-pink-600 hover:bg-pink-100 hover:text-pink-700 transition-all duration-300 shadow-md"
         >
@@ -248,76 +319,160 @@ export default function JournalPage() {
         </Button>
       </motion.div>
 
-      <Tabs defaultValue="all" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-3 rounded-full p-1 bg-pink-100 dark:bg-gray-800">
           <TabsTrigger 
             value="all" 
             className="rounded-full data-[state=active]:bg-pink-500 data-[state=active]:text-white transition-all duration-300"
-            onClick={() => loadEntries('all')}
           >
             All Entries
           </TabsTrigger>
           <TabsTrigger 
             value="shared" 
             className="rounded-full data-[state=active]:bg-pink-500 data-[state=active]:text-white transition-all duration-300"
-            onClick={() => loadEntries('shared')}
           >
             <Heart className="h-4 w-4 mr-1" /> Shared
           </TabsTrigger>
           <TabsTrigger 
             value="private" 
             className="rounded-full data-[state=active]:bg-pink-500 data-[state=active]:text-white transition-all duration-300"
-            onClick={() => loadEntries('private')}
           >
             <Lock className="h-4 w-4 mr-1" /> Private
           </TabsTrigger>
         </TabsList>
         
         <TabsContent value="all" className="mt-6">
-          <JournalEntryGrid entries={entries} loading={loading} hoveredCard={hoveredCard} setHoveredCard={setHoveredCard} />
+          <JournalEntryGrid 
+            entries={entries} 
+            loading={loading} 
+            hoveredCard={hoveredCard} 
+            setHoveredCard={setHoveredCard}
+            onLike={handleLike}
+            onRelive={handleReliveThisMoment}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         </TabsContent>
         
         <TabsContent value="shared" className="mt-6">
-          <JournalEntryGrid entries={entries.filter(e => !e.isPrivate)} loading={loading} hoveredCard={hoveredCard} setHoveredCard={setHoveredCard} />
+          <JournalEntryGrid 
+            entries={entries.filter(e => !e.isPrivate)} 
+            loading={loading} 
+            hoveredCard={hoveredCard} 
+            setHoveredCard={setHoveredCard}
+            onLike={handleLike}
+            onRelive={handleReliveThisMoment}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         </TabsContent>
         
         <TabsContent value="private" className="mt-6">
-          <JournalEntryGrid entries={entries.filter(e => e.isPrivate)} loading={loading} hoveredCard={hoveredCard} setHoveredCard={setHoveredCard} />
+          <JournalEntryGrid 
+            entries={entries.filter(e => e.isPrivate)} 
+            loading={loading} 
+            hoveredCard={hoveredCard} 
+            setHoveredCard={setHoveredCard}
+            onLike={handleLike}
+            onRelive={handleReliveThisMoment}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         </TabsContent>
       </Tabs>
-{showCreateForm && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2 }}
-      className="w-full max-w-2xl"
-    >
-      <Card className="overflow-hidden border-2 border-pink-200 dark:border-pink-800 shadow-lg relative">
-            <button 
-              onClick={() => setShowCreateForm(false)}
-              className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-100 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+
+      {/* Create Form Modal */}
+      {showCreateForm && (
+        <FormModal
+          title="Create New Journal Entry"
+          formData={formData}
+          setFormData={setFormData}
+          onSubmit={handleSubmit}
+          onClose={() => setShowCreateForm(false)}
+          creating={creating}
+          isEditing={false}
+        />
+      )}
+
+      {/* Edit Form Modal */}
+      {showEditForm && editingEntry && (
+        <FormModal
+          title="Edit Journal Entry"
+          formData={formData}
+          setFormData={setFormData}
+          onSubmit={handleUpdate}
+          onClose={() => {
+            setShowEditForm(false);
+            setEditingEntry(null);
+          }}
+          creating={creating}
+          isEditing={true}
+        />
+      )}
+
+      {/* Entry Detail Modal */}
+      {showEntryModal && selectedEntry && (
+        <EntryDetailModal
+          entry={selectedEntry}
+          onClose={() => {
+            setShowEntryModal(false);
+            setSelectedEntry(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Form Modal Component
+function FormModal({
+  title,
+  formData,
+  setFormData,
+  onSubmit,
+  onClose,
+  creating,
+  isEditing
+}: {
+  title: string;
+  formData: any;
+  setFormData: (data: any) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onClose: () => void;
+  creating: boolean;
+  isEditing: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2 }}
+        className="w-full max-w-2xl"
+      >
+        <Card className="overflow-hidden border-2 border-pink-200 dark:border-pink-800 shadow-lg relative">
+          <button 
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-100 transition-colors z-10"
+          >
+            <X className="h-6 w-6 text-gray-500" />
+          </button>
           <div className="absolute right-0 top-0 h-16 w-16">
             <div className="absolute transform rotate-45 bg-pink-500 text-white font-semibold py-1 right-[-35px] top-[32px] w-[170px] text-center">
-              New Memory
+              {isEditing ? 'Edit' : 'New Memory'}
             </div>
           </div>
           <CardHeader className="pb-2 bg-gradient-to-r from-pink-400 to-purple-500 text-white">
             <CardTitle className="text-xl flex items-center">
               <Sparkles className="h-5 w-5 mr-2" />
-              Create New Journal Entry
+              {title}
             </CardTitle>
             <CardDescription className="text-pink-100">
-              Capture your special moments together
+              {isEditing ? 'Update your special moment' : 'Capture your special moments together'}
             </CardDescription>
           </CardHeader>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={onSubmit}>
             <CardContent className="space-y-4 pt-6">
               <div className="space-y-2">
                 <Label htmlFor="title" className="text-pink-600 dark:text-pink-300 font-medium flex items-center">
@@ -389,34 +544,130 @@ export default function JournalPage() {
                 {creating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    {isEditing ? 'Updating...' : 'Saving...'}
                   </>
                 ) : (
-                  'Save This Memory'
+                  isEditing ? 'Update This Memory' : 'Save This Memory'
                 )}
               </Button>
             </CardFooter>
           </form>
-      </Card>
-    </motion.div>
-  </div>
-)}
-
+        </Card>
+      </motion.div>
     </div>
   );
 }
 
+// Entry Detail Modal Component
+function EntryDetailModal({
+  entry,
+  onClose
+}: {
+  entry: JournalEntry;
+  onClose: () => void;
+}) {
+  const formatDate = (date: Date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2 }}
+        className="w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+      >
+        <Card className="overflow-hidden border-2 border-pink-200 dark:border-pink-800 shadow-lg">
+          <div className={`h-2 ${entry.bgColor}`}></div>
+          <CardHeader className="pb-4 relative">
+            <button 
+              onClick={onClose}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <X className="h-6 w-6 text-gray-500" />
+            </button>
+            <div className="flex items-center space-x-4 mb-4">
+              <div className="text-4xl">{entry.emoji}</div>
+              <div>
+                <CardTitle className="text-2xl text-pink-700 dark:text-pink-300 mb-2">{entry.title}</CardTitle>
+                <CardDescription className="flex items-center text-base">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  {formatDate(entry.createdAt)}
+                </CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              {entry.isPrivate ? (
+                <div className="rounded-full bg-purple-100 dark:bg-purple-900 px-3 py-1 text-sm font-medium text-purple-600 dark:text-purple-300 flex items-center">
+                  <Lock className="h-4 w-4 mr-1" /> Private Memory
+                </div>
+              ) : (
+                <div className="rounded-full bg-pink-100 dark:bg-pink-900 px-3 py-1 text-sm font-medium text-pink-600 dark:text-pink-300 flex items-center">
+                  <Heart className="h-4 w-4 mr-1" /> Shared Memory
+                </div>
+              )}
+              {entry.mood && (
+                <div className="rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1 text-sm font-medium text-gray-600 dark:text-gray-300">
+                  {entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1)}
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="prose prose-pink dark:prose-invert max-w-none">
+              <p className="text-base leading-relaxed whitespace-pre-wrap">
+                {entry.content}
+              </p>
+            </div>
+          </CardContent>
+          <CardFooter className={`${entry.bgColor.replace('bg-gradient-to-br', 'bg-gradient-to-r')} bg-opacity-20 dark:bg-opacity-30 p-6`}>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center space-x-2">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  💕 A beautiful memory to cherish forever
+                </div>
+              </div>
+              <Button 
+                onClick={onClose}
+                className="bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 text-pink-600 hover:text-pink-700 border-0 shadow-sm"
+              >
+                Close
+              </Button>
+            </div>
+          </CardFooter>
+        </Card>
+      </motion.div>
+    </div>
+  );
+}
 
 function JournalEntryGrid({ 
   entries, 
   loading, 
   hoveredCard, 
-  setHoveredCard 
+  setHoveredCard,
+  onLike,
+  onRelive,
+  onEdit,
+  onDelete
 }: { 
   entries: JournalEntry[]; 
   loading: boolean; 
   hoveredCard: string | null; 
-  setHoveredCard: (id: string | null) => void; 
+  setHoveredCard: (id: string | null) => void;
+  onLike: (id: string) => void;
+  onRelive: (entry: JournalEntry) => void;
+  onEdit: (entry: JournalEntry) => void;
+  onDelete: (id: string) => void;
 }) {
   if (loading) {
     return (
@@ -456,17 +707,34 @@ function JournalEntryGrid({
           isHovered={hoveredCard === entry.id}
           onHover={() => setHoveredCard(entry.id)}
           onLeave={() => setHoveredCard(null)}
+          onLike={onLike}
+          onRelive={onRelive}
+          onEdit={onEdit}
+          onDelete={onDelete}
         />
       ))}
     </motion.div>
   );
 }
 
-function JournalEntryCard({ entry, isHovered, onHover, onLeave }: { 
+function JournalEntryCard({ 
+  entry, 
+  isHovered, 
+  onHover, 
+  onLeave, 
+  onLike, 
+  onRelive, 
+  onEdit, 
+  onDelete 
+}: { 
   entry: JournalEntry;
   isHovered: boolean;
   onHover: () => void;
   onLeave: () => void;
+  onLike: (id: string) => void;
+  onRelive: (entry: JournalEntry) => void;
+  onEdit: (entry: JournalEntry) => void;
+  onDelete: (id: string) => void;
 }) {
   const session = useSession();
   const isOwner = session.data?.user?.id === entry.userId;
@@ -477,25 +745,6 @@ function JournalEntryCard({ entry, isHovered, onHover, onLeave }: {
       month: 'long',
       day: 'numeric'
     });
-  };
-
-  // Placeholder handlers for edit and delete actions
-  const handleEdit = (entry: JournalEntry) => {
-    toast(
-      <div>
-        <strong>Not implemented</strong>
-        <div>Edit functionality is coming soon!</div>
-      </div>
-    );
-  };
-
-  const handleDelete = (id: string) => {
-    toast(
-      <div>
-        <strong>Not implemented</strong>
-        <div>Delete functionality is coming soon!</div>
-      </div>
-    );
   };
 
   return (
@@ -531,27 +780,43 @@ function JournalEntryCard({ entry, isHovered, onHover, onLeave }: {
             {entry.content}
           </p>
         </CardContent>
- <CardFooter className={`flex justify-between items-center gap-2 p-3 ${entry.bgColor.replace('bg-gradient-to-br', 'bg-gradient-to-r')} bg-opacity-20 dark:bg-opacity-30`}>
-  <div className="flex items-center gap-2">
-    <Button variant="ghost" size="sm" className="p-2 hover:bg-white/30">
-      <Heart className="h-4 w-4" />
-    </Button>
-    
-    <Button 
-      variant="outline" 
-      size="sm" 
-      className={`border-0 bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 shadow-sm ${
-        entry.isPrivate ? 'text-purple-600 hover:text-purple-700' : 'text-pink-600 hover:text-pink-700'
-      }`}
-    >
-      {isHovered ? "Relive This Moment" : "Read More"}
-    </Button>
-  </div>
-  
-  {isOwner && (
-    <EntryActionsMenu entry={entry} onEdit={handleEdit} onDelete={handleDelete} />
-  )}
-</CardFooter>
+        <CardFooter className={`flex justify-between items-center gap-2 p-3 ${entry.bgColor.replace('bg-gradient-to-br', 'bg-gradient-to-r')} bg-opacity-20 dark:bg-opacity-30`}>
+          <div className="flex items-center gap-2">
+            <motion.div
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+            >
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={`p-2 hover:bg-white/30 transition-colors ${
+                  entry.isLiked ? 'text-red-500' : 'text-gray-600 hover:text-red-500'
+                }`}
+                onClick={() => onLike(entry.id)}
+              >
+                <Heart className={`h-4 w-4 ${entry.isLiked ? 'fill-current' : ''}`} />
+                {entry.likeCount && entry.likeCount > 0 && (
+                  <span className="ml-1 text-xs">{entry.likeCount}</span>
+                )}
+              </Button>
+            </motion.div>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onRelive(entry)}
+              className={`border-0 bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 shadow-sm transition-all duration-200 ${
+                entry.isPrivate ? 'text-purple-600 hover:text-purple-700' : 'text-pink-600 hover:text-pink-700'
+              }`}
+            >
+              {isHovered ? "Relive This Moment" : "Read More"}
+            </Button>
+          </div>
+          
+          {isOwner && (
+            <EntryActionsMenu entry={entry} onEdit={onEdit} onDelete={onDelete} />
+          )}
+        </CardFooter>
       </Card>
     </motion.div>
   );
@@ -565,7 +830,7 @@ function EntryActionsMenu({ entry, onEdit, onDelete }: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm">
+        <Button variant="ghost" size="sm" className="hover:bg-white/30">
           <MoreVertical className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -574,13 +839,34 @@ function EntryActionsMenu({ entry, onEdit, onDelete }: {
           <Edit className="mr-2 h-4 w-4" />
           Edit
         </DropdownMenuItem>
-        <DropdownMenuItem 
-          onClick={() => onDelete(entry.id)}
-          className="text-red-600 focus:text-red-600"
-        >
-          <Trash className="mr-2 h-4 w-4" />
-          Delete
-        </DropdownMenuItem>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <DropdownMenuItem 
+              onSelect={(e) => e.preventDefault()}
+              className="text-red-600 focus:text-red-600"
+            >
+              <Trash className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure you want to delete this memory?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete "{entry.title}" and remove it from your journal.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => onDelete(entry.id)}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete Memory
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -29,7 +29,8 @@ import {
   HeartHandshake,
   FileQuestion,
   Menu,
-  X
+  X,
+  Gamepad2,
 } from 'lucide-react'
 import { getInitials } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
@@ -415,6 +416,18 @@ export const LoveJournalSidebar: React.FC<LoveJournalSidebarProps> = ({ session,
                         <motion.div animate={pathname === "/dashboard/quiz" ? heartbeat : {}} className="flex items-center">
                           <FileQuestion className="h-5 w-5 text-blue-600 group-hover:text-blue-700 transition-colors" />
                           <span className="text-blue-800 group-hover:text-blue-900 transition-colors">Quizzes</span>
+                        </motion.div>
+                      </motion.div>
+                    </SidebarLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === "/dashboard/games"} className="hover:bg-pink-100/50 transition-all">
+                    <SidebarLink href="/dashboard/games" className="group">
+                      <motion.div whileHover={{ rotate: 5 }} className="flex items-center">
+                        <motion.div animate={pathname === "/dashboard/games" ? heartbeat : {}} className="flex items-center">
+                          <Gamepad2 className="h-5 w-5 text-blue-600 group-hover:text-blue-700 transition-colors" />
+                          <span className="text-blue-800 group-hover:text-blue-900 transition-colors">Games</span>
                         </motion.div>
                       </motion.div>
                     </SidebarLink>

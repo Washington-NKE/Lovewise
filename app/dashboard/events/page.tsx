@@ -15,64 +15,107 @@ import {
   SelectValue 
 } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Calendar, CalendarIcon, Clock, Plus, Heart, Star, Gift, Film, ChevronRight } from 'lucide-react'
+import { Calendar, Clock, Plus, Heart, Star, Gift, Film, ChevronRight, Cake, Coffee, Plane, Music, PartyPopper, Camera, Sparkles, Users } from 'lucide-react'
 import { format } from "date-fns"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
+import { getUpcomingEventsByRelationship, getPastEventsByRelationship, getRelationshipId, createEvent } from "@/database/db"
+import type { Event as DBEvent } from "@/database/db"
+import { useSession } from "next-auth/react"
+import { toast } from "sonner"
 
 export default function EventsPage() {
-  const events = [
-    {
-      id: 1,
-      title: "Anniversary",
-      description: "Our special day",
-      date: "2025-03-15",
-      time: "18:00",
-      type: "Anniversary",
-      reminder: true,
-      icon: <Heart className="h-5 w-5" />,
-      gradient: "from-red-400 to-pink-600",
-    },
-    {
-      id: 2,
-      title: "Birthday",
-      description: "Partner's birthday celebration",
-      date: "2025-04-22",
-      time: "19:00",
-      type: "Birthday",
-      reminder: true,
-      icon: <Gift className="h-5 w-5" />,
-      gradient: "from-purple-400 to-indigo-600",
-    },
-    {
-      id: 3,
-      title: "Dinner Reservation",
-      description: "At our favorite restaurant",
-      date: "2025-03-20",
-      time: "20:00",
-      type: "Date Night",
-      reminder: true,
-      icon: <Star className="h-5 w-5" />,
-      gradient: "from-pink-500 to-rose-600",
-    },
-    {
-      id: 4,
-      title: "Movie Night",
-      description: "Watching the new release",
-      date: "2025-03-25",
-      time: "21:00",
-      type: "Date Night",
-      reminder: false,
-      icon: <Film className="h-5 w-5" />,
-      gradient: "from-fuchsia-500 to-purple-600",
-    },
-  ]
-
   const [date, setDate] = useState<Date | undefined>(undefined)
-  const [hoveredCard, setHoveredCard] = useState<number | null>(null)
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [showHearts, setShowHearts] = useState(false)
+  const [events, setEvents] = useState<DBEvent[]>([])
+  const [pastEvents, setPastEvents] = useState<DBEvent[]>([])
+  const [relationshipId, setRelationshipId] = useState<string | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    location: '',
+    time: '',
+    type: '',
+    isAllDay: false,
+    reminderTime: '',
+  })
+
+  const { data: session } = useSession()
+  const currentUserId = session?.user?.id
+
+  const fetchEventsData = async () => {
+    try {
+      console.log("🔍 Starting to fetch relationship ID...")
+      const relId = await getRelationshipId()
+      console.log("✅ Fetched relationship ID:", relId)
+      console.log("🔍 Type of relId:", typeof relId)
+      
+      setRelationshipId(relId)
+      
+      if (relId) {
+        console.log("🔍 Attempting to fetch events for relationship ID:", relId)
+        const fetchedEvents = await getUpcomingEventsByRelationship(relId)
+        console.log("✅ Raw fetched events:", fetchedEvents)
+        console.log("🔍 Number of events:", fetchedEvents?.length || 0)
+        console.log("🔍 Type of fetchedEvents:", typeof fetchedEvents)
+        console.log("🔍 Is array?", Array.isArray(fetchedEvents))
+        
+        if (fetchedEvents && Array.isArray(fetchedEvents)) {
+          setEvents(fetchedEvents)
+          console.log("✅ Events set in state")
+        } else {
+          console.warn("⚠️ fetchedEvents is not an array or is null/undefined")
+          setEvents([])
+        }
+      } else {
+        console.error("❌ No relationship ID found.")
+        setEvents([])
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch events:", error)
+      if (error instanceof Error) {
+        console.error("❌ Error details:", error.message)
+        console.error("❌ Error stack:", error.stack)
+      }
+      setEvents([])
+    }
+  }
+
+  const fetchPastEventsData = async () => {
+    try {
+      const relId = await getRelationshipId()
+      
+      setRelationshipId(relId)
+      
+      if (relId) {
+        const fetchedPastEvents = await getPastEventsByRelationship(relId)
+        
+        if (fetchedPastEvents && Array.isArray(fetchedPastEvents)) {
+          setPastEvents(fetchedPastEvents)
+        } else {
+          console.warn("⚠️ fetchedPastEvents is not an array or is null/undefined")
+          setPastEvents([])
+        }
+      } else {
+        console.error("❌ No relationship ID found.")
+        setPastEvents([])
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch past events:", error)
+      if (error instanceof Error) {
+        console.error("❌ Error details:", error.message)
+        console.error("❌ Error stack:", error.stack)
+      }
+      setPastEvents([])
+    }
+  }
 
   useEffect(() => {
     // Trigger heart animation at random intervals
@@ -80,10 +123,91 @@ export default function EventsPage() {
       setShowHearts(true)
       setTimeout(() => setShowHearts(false), 3000)
     }, 10000)
+
+    // Fetch relationship ID and events
+    fetchEventsData()
+    fetchPastEventsData()
     
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    console.log("📊 State updated - Relationship ID:", relationshipId)
+  }, [relationshipId])
+
+  useEffect(() => {
+    console.log("📊 State updated - Events:", events)
+    console.log("📊 Events length:", events?.length || 0)
+  }, [events])
+
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleCreateEvent = async () => {
+    if (!date || !formData.title || !relationshipId || !currentUserId) {
+      toast("Missing Information: Please fill in all required fields")
+      return
+    }
+
+    setIsCreating(true)
+    
+    try {
+      // Format the date and time
+      const startDate = new Date(date)
+      if (formData.time) {
+        const [hours, minutes] = formData.time.split(':')
+        startDate.setHours(parseInt(hours), parseInt(minutes))
+      }
+
+      const eventData = {
+        title: formData.title,
+        description: formData.description,
+        location: formData.location,
+        startDate: startDate,
+        endDate: startDate, // For now, same as start date
+        time: formData.time,
+        type: formData.type,
+        isAllDay: formData.isAllDay,
+        reminderTime: formData.reminderTime,
+        relationshipId: relationshipId,
+        creatorId: currentUserId,
+      }
+
+      await createEvent(eventData)
+      
+      // Reset form
+      setFormData({
+        title: '',
+        description: '',
+        location: '',
+        time: '',
+        type: '',
+        isAllDay: false,
+        reminderTime: '',
+      })
+      setDate(undefined)
+      setIsDialogOpen(false)
+      
+      // Refresh events
+      await fetchEventsData()
+      await fetchPastEventsData()
+      
+      toast("Event Created! Your special moment has been added successfully")
+    } catch (error) {
+      console.error("❌ Failed to create event:", error)
+      toast("Error: Failed to create event. Please try again.")
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  console.log("Relationship ID", relationshipId)
+  console.log("Fetched events:", events)
+  
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -94,11 +218,6 @@ export default function EventsPage() {
       }
     }
   }
-
-  // const cardVariants = {
-  //   hidden: { y: 20, opacity: 0 },
-  //   show: { y: 0, opacity: 1, transition: { duration: 0.4 } }
-  // }
 
   const FloatingHearts = () => {
     return (
@@ -112,8 +231,8 @@ export default function EventsPage() {
                 initial={{ 
                   opacity: 1, 
                   scale: Math.random() * 0.5 + 0.5,
-                  x: Math.random() * window.innerWidth, 
-                  y: window.innerHeight + 20 
+                  x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200), 
+                  y: (typeof window !== 'undefined' ? window.innerHeight : 800) + 20 
                 }}
                 animate={{ 
                   y: -100, 
@@ -158,7 +277,7 @@ export default function EventsPage() {
           </div>
         </div>
         
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-white text-pink-600 hover:bg-pink-100 hover:text-pink-700 transition-all duration-300 shadow-md">
               <Plus className="mr-2 h-4 w-4" />
@@ -178,11 +297,33 @@ export default function EventsPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="title" className="text-pink-600 dark:text-pink-300 font-medium">What&apos;s the Occasion?</Label>
-                <Input id="title" placeholder="Enter event title" className="border-pink-200 focus:border-pink-500 focus:ring-pink-500" />
+                <Input 
+                  id="title" 
+                  placeholder="Enter event title" 
+                  value={formData.title}
+                  onChange={(e) => handleInputChange('title', e.target.value)}
+                  className="border-pink-200 focus:border-pink-500 focus:ring-pink-500" 
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="description" className="text-pink-600 dark:text-pink-300 font-medium">Description</Label>
-                <Textarea id="description" placeholder="Describe this special moment" className="border-pink-200 focus:border-pink-500 focus:ring-pink-500" />
+                <Textarea 
+                  id="description" 
+                  placeholder="Describe this special moment" 
+                  value={formData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  className="border-pink-200 focus:border-pink-500 focus:ring-pink-500" 
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="location" className="text-pink-600 dark:text-pink-300 font-medium">Location (Optional)</Label>
+                <Input 
+                  id="location" 
+                  placeholder="Where will this happen?" 
+                  value={formData.location}
+                  onChange={(e) => handleInputChange('location', e.target.value)}
+                  className="border-pink-200 focus:border-pink-500 focus:ring-pink-500" 
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="date" className="text-pink-600 dark:text-pink-300 font-medium">When is it?</Label>
@@ -195,7 +336,7 @@ export default function EventsPage() {
                         !date && "text-muted-foreground"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      <Calendar className="mr-2 h-4 w-4" />
                       {date ? format(date, "PPP") : "Select a date"}
                     </Button>
                   </PopoverTrigger>
@@ -212,11 +353,17 @@ export default function EventsPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="time" className="text-pink-600 dark:text-pink-300 font-medium">At what time?</Label>
-                <Input id="time" type="time" className="border-pink-200 focus:border-pink-500 focus:ring-pink-500" />
+                <Input 
+                  id="time" 
+                  type="time" 
+                  value={formData.time}
+                  onChange={(e) => handleInputChange('time', e.target.value)}
+                  className="border-pink-200 focus:border-pink-500 focus:ring-pink-500" 
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="type" className="text-pink-600 dark:text-pink-300 font-medium">Type of Moment</Label>
-                <Select>
+                <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
                   <SelectTrigger id="type" className="border-pink-200 focus:border-pink-500 focus:ring-pink-500">
                     <SelectValue placeholder="Select event type" />
                   </SelectTrigger>
@@ -232,15 +379,26 @@ export default function EventsPage() {
                 </Select>
               </div>
               <div className="flex items-center space-x-2 p-3 rounded-lg bg-pink-50 dark:bg-gray-800">
-                <input type="checkbox" id="reminder" className="rounded text-pink-500 border-pink-300 focus:ring-pink-500" />
+                <input 
+                  type="checkbox" 
+                  id="reminder" 
+                  checked={formData.isAllDay}
+                  onChange={(e) => handleInputChange('isAllDay', e.target.checked)}
+                  className="rounded text-pink-500 border-pink-300 focus:ring-pink-500" 
+                />
                 <Label htmlFor="reminder" className="flex items-center cursor-pointer">
-                  <span className="text-pink-700 dark:text-pink-300 font-medium">Set reminder for this moment</span>
+                  <span className="text-pink-700 dark:text-pink-300 font-medium">All day event</span>
                 </Label>
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 transition-all duration-300">
-                Save This Moment
+              <Button 
+                type="submit" 
+                onClick={handleCreateEvent}
+                disabled={isCreating}
+                className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 transition-all duration-300"
+              >
+                {isCreating ? 'Creating...' : 'Save This Moment'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -283,56 +441,99 @@ export default function EventsPage() {
         </TabsContent>
         
         <TabsContent value="past" className="mt-6">
-          <motion.div 
-            className="flex items-center justify-center p-12 text-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="space-y-4">
-              <motion.div 
-                className="w-20 h-20 mx-auto bg-pink-100 dark:bg-pink-900 rounded-full flex items-center justify-center"
-                animate={{ 
-                  scale: [1, 1.1, 1],
-                  rotate: [0, 5, -5, 0] 
-                }}
-                transition={{ 
-                  duration: 4,
-                  repeat: Infinity,
-                  repeatType: "reverse"
-                }}
-              >
-                <Heart className="h-10 w-10 text-pink-500" />
-              </motion.div>
-              <h3 className="text-xl font-medium text-pink-700 dark:text-pink-300">No past moments yet</h3>
-              <p className="text-sm text-pink-500">
-                Your shared memories will appear here after they happen
-              </p>
-              <Button className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 mt-2">
-                Create Fake Memory
-              </Button>
-            </div>
-          </motion.div>
+          {pastEvents.length > 0 ? ( 
+            <motion.div 
+              className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+            >
+              {pastEvents.map((event) => (
+                <EventCard 
+                  key={event.id} 
+                  event={event} 
+                  isHovered={hoveredCard === event.id}
+                  onHover={() => setHoveredCard(event.id)}
+                  onLeave={() => setHoveredCard(null)}
+                />
+              ))}
+            </motion.div>
+          ) : (
+            <motion.div 
+              className="flex items-center justify-center p-12 text-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="space-y-4">
+                <motion.div 
+                  className="w-20 h-20 mx-auto bg-pink-100 dark:bg-pink-900 rounded-full flex items-center justify-center"
+                  animate={{ 
+                    scale: [1, 1.1, 1],
+                    rotate: [0, 5, -5, 0] 
+                  }}
+                  transition={{ 
+                    duration: 4,
+                    repeat: Infinity,
+                    repeatType: "reverse"
+                  }}
+                >
+                  <Heart className="h-10 w-10 text-pink-500" />
+                </motion.div>
+                <h3 className="text-xl font-medium text-pink-700 dark:text-pink-300">No past moments yet</h3>
+                <p className="text-sm text-pink-500">
+                  Your shared memories will appear here after they happen
+                </p>
+              </div>
+            </motion.div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
   )
 }
 
-interface Event {
-  id: number;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  type: string;
-  reminder: boolean;
-  icon?: React.ReactNode;
-  gradient?: string;
+const getIconByType = (type: string) => {
+  const typeIconMap = {
+    'anniversary': Heart,
+    'birthday': Cake,
+    'date-night': Coffee,
+    'intimate': Heart,
+    'milestone': Star,
+    'surprise': Gift,
+    'movie': Film,
+    'travel': Plane,
+    'music': Music,
+    'party': PartyPopper,
+    'photo': Camera,
+    'celebration': Sparkles,
+    'meeting': Users,
+    'other': Calendar,
+  }
+  
+  return typeIconMap[type.toLowerCase() as keyof typeof typeIconMap] || Heart 
 }
 
-function EventCard({ event, isHovered, onHover, onLeave }: { 
-  event: Event; 
+const getIconByKeywords = (title: string, description: string) => {
+  const text = `${title} ${description}`.toLowerCase()
+  
+  if (text.includes('birthday') || text.includes('birth')) return Cake
+  if (text.includes('anniversary') || text.includes('love')) return Heart
+  if (text.includes('dinner') || text.includes('restaurant') || text.includes('coffee')) return Coffee
+  if (text.includes('movie') || text.includes('film') || text.includes('cinema')) return Film
+  if (text.includes('travel') || text.includes('trip') || text.includes('vacation')) return Plane
+  if (text.includes('party') || text.includes('celebration')) return PartyPopper
+  if (text.includes('photo') || text.includes('picture')) return Camera
+  if (text.includes('music') || text.includes('concert')) return Music
+  if (text.includes('surprise') || text.includes('gift')) return Gift
+  if (text.includes('milestone') || text.includes('achievement')) return Star
+  if (text.includes('meeting') || text.includes('friends')) return Users
+  
+  return Heart // Default icon
+}
+
+export function EventCard({ event, isHovered, onHover, onLeave }: { 
+  event: DBEvent; 
   isHovered: boolean;
   onHover: () => void;
   onLeave: () => void;
@@ -340,11 +541,15 @@ function EventCard({ event, isHovered, onHover, onLeave }: {
   const eventDate = new Date(event.date)
   const today = new Date()
   const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  const dueDate = format(new Date(eventDate), "MMMM d, yyyy")
+  
+  // Combine approaches with priority
+  const IconComponent = event.type ? getIconByType(event.type) : getIconByKeywords(event.title || '', event.description || '')
   
   const cardVariants = {
     hidden: { y: 20, opacity: 0 },
     show: { y: 0, opacity: 1, transition: { duration: 0.4 } }
-  };
+  }
   
   return (
     <motion.div
@@ -375,7 +580,7 @@ function EventCard({ event, isHovered, onHover, onLeave }: {
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <div className={`p-1 rounded-full bg-gradient-to-r ${event.gradient || 'from-pink-500 to-purple-500'} text-white`}>
-                  {event.icon || <Heart className="h-4 w-4" />}
+                  <IconComponent className="h-4 w-4" />
                 </div>
                 {event.title}
               </CardTitle>
@@ -405,7 +610,7 @@ function EventCard({ event, isHovered, onHover, onLeave }: {
                 className={`text-sm font-medium bg-gradient-to-r ${event.gradient || 'from-pink-500 to-purple-500'} text-white px-3 py-1 rounded-full`}
                 whileHover={{ scale: 1.05 }}
               >
-                {daysUntil} days away
+                {daysUntil < 0 ? `${dueDate}` : daysUntil === 0 ? `Today` : daysUntil === 1 ? `Tomorrow` : `${daysUntil} days away`}
               </motion.div>
               <Button 
                 variant="ghost" 

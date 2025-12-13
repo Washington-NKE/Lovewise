@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
+import { useSession } from "next-auth/react"
 import { 
   Tabs, 
   TabsContent, 
@@ -16,25 +17,24 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card"
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { 
   Select, 
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
   SelectValue 
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Progress } from "@/components/ui/progress";
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { Progress } from "@/components/ui/progress"
 import { 
   Avatar, 
   AvatarFallback 
-} from "@/components/ui/avatar";
-
+} from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { 
   Gift, 
@@ -47,142 +47,629 @@ import {
   Sparkles, 
   Camera, 
   DollarSign,
-  Flame
+  Flame,
+  Loader2
 } from 'lucide-react'
+
+// Types
+interface Gift {
+  id: string
+  giftName: string
+  date: string
+  occasion: string
+  description?: string
+  reaction?: string
+  image?: string
+  favorite: boolean
+  giverId: string
+  recipientId: string
+}
+
+interface WishlistItem {
+  id: string
+  item: string
+  priority: 'MUST_HAVE' | 'WOULD_LOVE' | 'NICE_TO_HAVE'
+  surprise: number
+  notes?: string
+  gifted: boolean
+  userId: string
+}
+
+interface SpecialOccasion {
+  id: string
+  title: string
+  date: string
+  budget?: number
+  suggestions: string[]
+  reminder: boolean
+  userId: string
+}
+
+interface ThoughtfulIdea {
+  id: string
+  title: string
+  description: string
+  type: 'DIY' | 'EXPERIENCE' | 'INTIMATE' | 'PERSONALIZED'
+  progress: number
+  targetDate?: string
+  completed: boolean
+  userId: string
+}
+
+interface SecretPlan {
+  id: string
+  title: string
+  description?: string
+  progress: number
+  budget?: number
+  targetDate?: string
+  userId: string
+}
+
+interface SecretPlanItem {
+  id: string
+  secretPlanId: string
+  item: string
+  completed: boolean
+  cost?: number
+  notes?: string
+}
+
+interface LoveLetter {
+  id: string
+  content: string
+  title?: string
+  private: boolean
+  delivered: boolean
+  userId: string
+  createdAt: string
+}
 
 export default function GiftsPage() {
   const { theme } = useTheme()
+  const { data: session } = useSession()
   const [mounted, setMounted] = useState(false)
   
+  // State for all data
+  const [gifts, setGifts] = useState<Gift[]>([])
+  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
+  const [occasions, setOccasions] = useState<SpecialOccasion[]>([])
+  const [thoughtfulIdeas, setThoughtfulIdeas] = useState<ThoughtfulIdea[]>([])
+  const [secretPlans, setSecretPlans] = useState<SecretPlan[]>([])
+  const [secretPlanItems, setSecretPlanItems] = useState<SecretPlanItem[]>([])
+  const [loveLetters, setLoveLetters] = useState<LoveLetter[]>([])
+  
+  // Loading states
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+
+  // Form states
+  const [newGift, setNewGift] = useState({
+    giftName: "",
+    date: "",
+    occasion: "",
+    recipientId: "",
+    description: "",
+    reaction: "",
+    favorite: false
+  })
+  
+  const [newWishlistItem, setNewWishlistItem] = useState({
+    item: "",
+    priority: "WOULD_LOVE" as const,
+    surprise: 50,
+    notes: "",
+    gifted: false
+  })
+  
+  const [newOccasion, setNewOccasion] = useState({
+    title: "",
+    date: "",
+    budget: "",
+    suggestions: "",
+    reminder: true
+  })
+  
+  const [newIdea, setNewIdea] = useState({
+    title: "",
+    description: "",
+    type: "DIY" as const,
+    progress: 0,
+    targetDate: "",
+    completed: false
+  })
+  
+  const [newSecretPlan, setNewSecretPlan] = useState({
+    title: "",
+    description: "",
+    budget: "",
+    targetDate: ""
+  })
+  
+  const [newLoveLetter, setNewLoveLetter] = useState({
+    content: "",
+    title: "",
+    private: false
+  })
+
   // Theme handling
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Mock data for demonstration
-  const [giftHistory] = useState([
-    {
-      id: 1,
-      giftName: "Silk Lingerie Set",
-      date: "February 14, 2025",
-      occasion: "Valentine's Day",
-      giver: "user",
-      recipient: "partner",
-      description: "Delicate black lace with red accents",
-      reaction: "She loved it! Couldn't wait to try it on...",
-      image: "/placeholder.svg?height=150&width=200",
-      favorite: true
-    },
-    {
-      id: 2,
-      giftName: "Couples Massage Package",
-      date: "January 18, 2025",
-      occasion: "Date Night",
-      giver: "partner",
-      recipient: "user",
-      description: "Private massage studio with aromatherapy",
-      reaction: "Perfect way to relax together. The evening that followed was unforgettable.",
-      image: "/placeholder.svg?height=150&width=200",
-      favorite: true
-    },
-    {
-      id: 3,
-      giftName: "Handwritten Love Letters",
-      date: "December 25, 2024",
-      occasion: "Christmas",
-      giver: "user",
-      recipient: "partner",
-      description: "A collection of 12 sealed letters, one to open each month",
-      reaction: "Made her cry. She said it was the most thoughtful gift ever.",
-      image: "/placeholder.svg?height=150&width=200",
-      favorite: false
+  // Load data on component mount
+  useEffect(() => {
+    if (mounted && session?.user?.id) {
+      loadAllData()
     }
-  ])
+  }, [mounted, session])
 
-  const [wishlist] = useState([
-    {
-      id: 1,
-      item: "Weekend Getaway",
-      priority: "Must-Have",
-      surprise: 70,
-      person: "partner",
-      notes: "A cabin in the woods, just the two of us"
-    },
-    {
-      id: 2,
-      item: "Leather Cuffs",
-      priority: "Would Love",
-      surprise: 90,
-      person: "user",
-      notes: "The ones from that store we visited"
-    },
-    {
-      id: 3,
-      item: "Scented Candles Collection",
-      priority: "Nice to Have",
-      surprise: 50,
-      person: "partner",
-      notes: "Especially like the vanilla and sandalwood ones"
+  const loadAllData = async () => {
+    try {
+      setLoading(true)
+      await Promise.all([
+        loadGifts(),
+        loadWishlist(),
+        loadOccasions(),
+        loadThoughtfulIdeas(),
+        loadSecretPlans(),
+        loadLoveLetters()
+      ])
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setLoading(false)
     }
-  ])
+  }
 
-  const [occasions] = useState([
-    {
-      id: 1,
-      title: "Anniversary",
-      date: "April 15, 2025",
-      daysLeft: 17,
-      suggestions: ["Jewelry", "Weekend Trip", "Custom Photo Album"],
-      budget: 300
-    },
-    {
-      id: 2,
-      title: "Partner's Birthday",
-      date: "May 22, 2025",
-      daysLeft: 54,
-      suggestions: ["Spa Day", "Concert Tickets", "That watch they've been eyeing"],
-      budget: 250
+  const loadGifts = async () => {
+    try {
+      const response = await fetch('/api/gifts')
+      if (response.ok) {
+        const data = await response.json()
+        setGifts(data)
+      }
+    } catch (error) {
+      console.error('Error loading gifts:', error)
     }
-  ])
+  }
 
-  const [thoughtfulIdeas] = useState([
-    {
-      id: 1,
-      title: "Memory Jar",
-      description: "Fill a jar with 52 memories/reasons why you love them - one to read each week",
-      type: "DIY",
-      progress: 75
-    },
-    {
-      id: 2,
-      title: "Recreate First Date",
-      description: "With some spicy new additions at the end of the night",
-      type: "Experience",
-      progress: 30
+  const loadWishlist = async () => {
+    try {
+      const response = await fetch('/api/wishlist')
+      if (response.ok) {
+        const data = await response.json()
+        setWishlistItems(data)
+      }
+    } catch (error) {
+      console.error('Error loading wishlist:', error)
     }
-  ])
+  }
 
-  // Mock new gift form state
-  const [newGift, setNewGift] = useState({
-    giftName: "",
-    date: "",
-    occasion: "",
-    recipient: "partner",
-    description: "",
-    reaction: ""
-  })
+  const loadOccasions = async () => {
+    try {
+      const response = await fetch('/api/occasions')
+      if (response.ok) {
+        const data = await response.json()
+        setOccasions(data)
+      }
+    } catch (error) {
+      console.error('Error loading occasions:', error)
+    }
+  }
 
-  // Mock new wishlist item form state
-  const [newWishlistItem, setNewWishlistItem] = useState({
-    item: "",
-    priority: "Would Love",
-    surprise: 50,
-    person: "user",
-    notes: ""
-  })
+  const loadThoughtfulIdeas = async () => {
+    try {
+      const response = await fetch('/api/thoughtful-ideas')
+      if (response.ok) {
+        const data = await response.json()
+        setThoughtfulIdeas(data)
+      }
+    } catch (error) {
+      console.error('Error loading thoughtful ideas:', error)
+    }
+  }
+
+  const loadSecretPlans = async () => {
+    try {
+      const response = await fetch('/api/secret-plans')
+      if (response.ok) {
+        const data = await response.json()
+        setSecretPlans(data)
+      }
+      
+      const itemsResponse = await fetch('/api/secret-plan-items')
+      if (itemsResponse.ok) {
+        const itemsData = await itemsResponse.json()
+        setSecretPlanItems(itemsData)
+      }
+    } catch (error) {
+      console.error('Error loading secret plans:', error)
+    }
+  }
+
+  const loadLoveLetters = async () => {
+    try {
+      const response = await fetch('/api/love-letters')
+      if (response.ok) {
+        const data = await response.json()
+        setLoveLetters(data)
+      }
+    } catch (error) {
+      console.error('Error loading love letters:', error)
+    }
+  }
+
+  // Submit handlers
+  const handleSubmitGift = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!session?.user?.id) return
+
+    setSubmitting(true)
+    try {
+      const response = await fetch('/api/gifts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...newGift,
+          giverId: session.user.id,
+          recipientId: newGift.recipientId || session.user.id
+        }),
+      })
+
+      if (response.ok) {
+        const gift = await response.json()
+        setGifts(prev => [...prev, gift])
+        setNewGift({
+          giftName: "",
+          date: "",
+          occasion: "",
+          recipientId: "",
+          description: "",
+          reaction: "",
+          favorite: false
+        })
+      }
+    } catch (error) {
+      console.error('Error creating gift:', error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleSubmitWishlistItem = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!session?.user?.id) return
+
+    setSubmitting(true)
+    try {
+      const response = await fetch('/api/wishlist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...newWishlistItem,
+          userId: session.user.id
+        }),
+      })
+
+      if (response.ok) {
+        const item = await response.json()
+        setWishlistItems(prev => [...prev, item])
+        setNewWishlistItem({
+          item: "",
+          priority: "WOULD_LOVE" as const,
+          surprise: 50,
+          notes: "",
+          gifted: false
+        })
+      }
+    } catch (error) {
+      console.error('Error creating wishlist item:', error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleSubmitOccasion = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!session?.user?.id) return
+
+    setSubmitting(true)
+    try {
+      const response = await fetch('/api/occasions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: newOccasion.title,
+          date: newOccasion.date,
+          budget: newOccasion.budget ? parseFloat(newOccasion.budget) : undefined,
+          suggestions: newOccasion.suggestions.split('\n').filter(s => s.trim()),
+          reminder: newOccasion.reminder,
+          userId: session.user.id
+        }),
+      })
+
+      if (response.ok) {
+        const occasion = await response.json()
+        setOccasions(prev => [...prev, occasion])
+        setNewOccasion({
+          title: "",
+          date: "",
+          budget: "",
+          suggestions: "",
+          reminder: true
+        })
+      }
+    } catch (error) {
+      console.error('Error creating occasion:', error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleSubmitIdea = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!session?.user?.id) return
+
+    setSubmitting(true)
+    try {
+      const response = await fetch('/api/thoughtful-ideas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...newIdea,
+          userId: session.user.id
+        }),
+      })
+
+      if (response.ok) {
+        const idea = await response.json()
+        setThoughtfulIdeas(prev => [...prev, idea])
+        setNewIdea({
+          title: "",
+          description: "",
+          type: "DIY" as const,
+          progress: 0,
+          targetDate: "",
+          completed: false
+        })
+      }
+    } catch (error) {
+      console.error('Error creating idea:', error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleSubmitSecretPlan = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!session?.user?.id) return
+
+    setSubmitting(true)
+    try {
+      const targetDate = new Date(newSecretPlan.targetDate)
+      const response = await fetch('/api/secret-plans', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: newSecretPlan.title,
+          description: newSecretPlan.description,
+          budget: newSecretPlan.budget ? parseFloat(newSecretPlan.budget) : undefined,
+          targetDate: targetDate,
+          progress: 0,
+          userId: session.user.id
+        }),
+      })
+
+      if (response.ok) {
+        const plan = await response.json()
+        setSecretPlans(prev => [...prev, plan])
+        setNewSecretPlan({
+          title: "",
+          description: "",
+          budget: "",
+          targetDate: ""
+        })
+      }
+    } catch (error) {
+      console.error('Error creating secret plan:', error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleSubmitLoveLetter = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!session?.user?.id) return
+
+    setSubmitting(true)
+    try {
+      const response = await fetch('/api/love-letters', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...newLoveLetter,
+          userId: session.user.id,
+          delivered: false
+        }),
+      })
+
+      if (response.ok) {
+        const letter = await response.json()
+        setLoveLetters(prev => [...prev, letter])
+        setNewLoveLetter({
+          content: "",
+          title: "",
+          private: false
+        })
+      }
+    } catch (error) {
+      console.error('Error creating love letter:', error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Update handlers
+  const toggleGiftFavorite = async (giftId: string) => {
+    try {
+      const gift = gifts.find(g => g.id === giftId)
+      if (!gift) return
+
+      const response = await fetch(`/api/gifts/${giftId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...gift,
+          favorite: !gift.favorite
+        }),
+      })
+
+      if (response.ok) {
+        const updatedGift = await response.json()
+        setGifts(prev => prev.map(g => g.id === giftId ? updatedGift : g))
+      }
+    } catch (error) {
+      console.error('Error updating gift favorite:', error)
+    }
+  }
+
+  const markWishlistItemAsGifted = async (itemId: string) => {
+    try {
+      const item = wishlistItems.find(w => w.id === itemId)
+      if (!item) return
+
+      const response = await fetch(`/api/wishlist/${itemId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...item,
+          gifted: true
+        }),
+      })
+
+      if (response.ok) {
+        const updatedItem = await response.json()
+        setWishlistItems(prev => prev.map(w => w.id === itemId ? updatedItem : w))
+      }
+    } catch (error) {
+      console.error('Error updating wishlist item:', error)
+    }
+  }
+
+  const updateIdeaProgress = async (ideaId: string, progress: number) => {
+    try {
+      const idea = thoughtfulIdeas.find(i => i.id === ideaId)
+      if (!idea) return
+
+      const response = await fetch(`/api/thoughtful-ideas/${ideaId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...idea,
+          progress,
+          completed: progress >= 100
+        }),
+      })
+
+      if (response.ok) {
+        const updatedIdea = await response.json()
+        setThoughtfulIdeas(prev => prev.map(i => i.id === ideaId ? updatedIdea : i))
+      }
+    } catch (error) {
+      console.error('Error updating idea progress:', error)
+    }
+  }
+
+  // Delete handlers
+  const deleteGift = async (giftId: string) => {
+    try {
+      const response = await fetch(`/api/gifts/${giftId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setGifts(prev => prev.filter(g => g.id !== giftId))
+      }
+    } catch (error) {
+      console.error('Error deleting gift:', error)
+    }
+  }
+
+  const deleteWishlistItem = async (itemId: string) => {
+    try {
+      const response = await fetch(`/api/wishlist/${itemId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setWishlistItems(prev => prev.filter(w => w.id !== itemId))
+      }
+    } catch (error) {
+      console.error('Error deleting wishlist item:', error)
+    }
+  }
+
+  // Utility functions
+  const calculateDaysUntil = (date: string) => {
+    const today = new Date()
+    const targetDate = new Date(date)
+    const diffTime = targetDate.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
+  }
+
+  const getPriorityBadge = (priority: string) => {
+    const isDark = theme === "dark"
+    switch (priority) {
+      case "MUST_HAVE":
+        return <Badge className={isDark ? "bg-purple-700 text-white" : "bg-pink-600 text-white"}>Must Have</Badge>
+      case "WOULD_LOVE":
+        return <Badge className={isDark ? "bg-purple-500 text-white" : "bg-pink-400 text-white"}>Would Love</Badge>
+      case "NICE_TO_HAVE":
+        return <Badge className={isDark ? "bg-purple-400 text-white" : "bg-pink-300 text-white"}>Nice to Have</Badge>
+      default:
+        return <Badge>{priority}</Badge>
+    }
+  }
+
+  const getItemsForSecretPlan = (planId: string) => {
+    return secretPlanItems.filter(item => item.secretPlanId === planId)
+  }
+
+  const getFavoriteGifts = () => {
+    return gifts.filter(gift => gift.favorite)
+  }
 
   // Don't render with SSR to avoid hydration mismatch
   if (!mounted) return null
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
 
   // Custom theme styles based on dark/light mode
   const isDark = theme === "dark"
@@ -203,25 +690,9 @@ export default function GiftsPage() {
     tabs: isDark ? "bg-zinc-800" : "bg-white",
     tabSelected: isDark ? "bg-purple-700 text-white" : "bg-pink-500 text-white",
     tabList: isDark ? "bg-zinc-700" : "bg-pink-100",
-    priorityHigh: isDark ? "bg-purple-700 text-white" : "bg-pink-600 text-white",
-    priorityMed: isDark ? "bg-purple-500 text-white" : "bg-pink-400 text-white",
-    priorityLow: isDark ? "bg-purple-400 text-white" : "bg-pink-300 text-white",
     flame: isDark ? "text-purple-500" : "text-pink-500",
     divider: isDark ? "border-purple-700" : "border-pink-200",
     highlight: isDark ? "bg-purple-900/30" : "bg-pink-100/50"
-  }
-
-  const getPriorityBadge = (priority : string) => {
-    switch (priority) {
-      case "Must-Have":
-        return <Badge className={themeStyles.priorityHigh}>{priority}</Badge>
-      case "Would Love":
-        return <Badge className={themeStyles.priorityMed}>{priority}</Badge>
-      case "Nice to Have":
-        return <Badge className={themeStyles.priorityLow}>{priority}</Badge>
-      default:
-        return <Badge>{priority}</Badge>
-    }
   }
 
   return (
@@ -232,10 +703,6 @@ export default function GiftsPage() {
           Intimate Gifts
           <Flame className={`ml-2 h-5 w-5 ${themeStyles.flame}`} />
         </h2>
-        <Button className={themeStyles.button}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add New Gift
-        </Button>
       </div>
 
       <Tabs defaultValue="history" className="w-full">
@@ -265,7 +732,7 @@ export default function GiftsPage() {
         {/* Gift History Tab */}
         <TabsContent value="history" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {giftHistory.map(gift => (
+            {gifts.map(gift => (
               <Card key={gift.id} className={`${themeStyles.card} ${themeStyles.cardHover} transition-all`}>
                 <CardHeader className={`${themeStyles.header} pb-2`}>
                   <div className="flex justify-between items-start">
@@ -281,38 +748,35 @@ export default function GiftsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pb-2">
-                  <div className="flex gap-4 mb-4">
-                    <div className="w-1/3">
-                      <img 
-                        src={gift.image} 
-                        alt={gift.giftName} 
-                        className="rounded-md w-full h-auto object-cover"
-                      />
-                    </div>
-                    <div className="w-2/3">
-                      <p className={`mb-1 ${themeStyles.primary}`}>
-                        <span className="font-semibold">From:</span> {gift.giver === "user" ? "You" : "Partner"}
-                      </p>
-                      <p className={`mb-1 ${themeStyles.primary}`}>
-                        <span className="font-semibold">To:</span> {gift.recipient === "user" ? "You" : "Partner"}
-                      </p>
-                      <p className={`mb-1 ${themeStyles.primary}`}>
-                        <span className="font-semibold">Description:</span> {gift.description}
-                      </p>
+                  <div className="mb-4">
+                    <p className={`mb-2 ${themeStyles.primary}`}>
+                      <span className="font-semibold">Description:</span> {gift.description}
+                    </p>
+                    {gift.reaction && (
                       <div className={`mt-3 p-3 italic rounded-md ${themeStyles.highlight}`}>
-                        &quot;{gift.reaction}&quot;
+                        "{gift.reaction}"
                       </div>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
                 <CardFooter className={`${themeStyles.footer} pt-1 flex justify-between`}>
-                  <Button variant="outline" size="sm" className={themeStyles.buttonOutline}>
-                    <Edit className="mr-1 h-3 w-3" />
-                    Edit
-                  </Button>
-                  <Button variant="outline" size="sm" className={themeStyles.buttonOutline}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={themeStyles.buttonOutline}
+                    onClick={() => toggleGiftFavorite(gift.id)}
+                  >
                     <Heart className={`mr-1 h-3 w-3 ${gift.favorite ? "fill-current" : ""}`} />
-                    Favorite
+                    {gift.favorite ? "Unfavorite" : "Favorite"}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={themeStyles.buttonOutline}
+                    onClick={() => deleteGift(gift.id)}
+                  >
+                    <Trash className="mr-1 h-3 w-3" />
+                    Delete
                   </Button>
                 </CardFooter>
               </Card>
@@ -323,264 +787,185 @@ export default function GiftsPage() {
             <CardHeader>
               <CardTitle className={themeStyles.title}>Add New Gift Memory</CardTitle>
               <CardDescription className={themeStyles.secondary}>
-                Record a new gift you&apos;ve given or received
+                Record a new gift you've given or received
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <div>
-                    <Label className={themeStyles.primary}>Gift Name</Label>
-                    <Input 
-                      placeholder="What was the gift?" 
-                      className={themeStyles.input}
-                      value={newGift.giftName}
-                      onChange={(e : React.ChangeEvent<HTMLInputElement>) => setNewGift({...newGift, giftName: e.target.value})}
-                    />
+              <form onSubmit={handleSubmitGift}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div>
+                      <Label className={themeStyles.primary}>Gift Name</Label>
+                      <Input 
+                        placeholder="What was the gift?" 
+                        className={themeStyles.input}
+                        value={newGift.giftName}
+                        onChange={(e) => setNewGift({...newGift, giftName: e.target.value})}
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label className={themeStyles.primary}>Date</Label>
+                      <Input 
+                        type="date" 
+                        className={themeStyles.input}
+                        value={newGift.date}
+                        onChange={(e) => setNewGift({...newGift, date: e.target.value})}
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label className={themeStyles.primary}>Occasion</Label>
+                      <Input 
+                        placeholder="What was the occasion?" 
+                        className={themeStyles.input}
+                        value={newGift.occasion}
+                        onChange={(e) => setNewGift({...newGift, occasion: e.target.value})}
+                        required
+                      />
+                    </div>
                   </div>
                   
-                  <div>
-                    <Label className={themeStyles.primary}>Date</Label>
-                    <Input 
-                      type="date" 
-                      className={themeStyles.input}
-                      value={newGift.date}
-                      onChange={(e : React.ChangeEvent<HTMLInputElement>) => setNewGift({...newGift, date: e.target.value})}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className={themeStyles.primary}>Occasion</Label>
-                    <Input 
-                      placeholder="What was the occasion?" 
-                      className={themeStyles.input}
-                      value={newGift.occasion}
-                      onChange={(e : React.ChangeEvent<HTMLInputElement>) => setNewGift({...newGift, occasion: e.target.value})}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className={themeStyles.primary}>Gift Direction</Label>
-                    <Select 
-                      value={newGift.recipient} 
-                      onValueChange={(value : string) => setNewGift({...newGift, recipient: value})}
-                    >
-                      <SelectTrigger className={themeStyles.input}>
-                        <SelectValue placeholder="Select direction" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="partner">Given to Partner</SelectItem>
-                        <SelectItem value="user">Received from Partner</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <Label className={themeStyles.primary}>Description</Label>
-                    <Textarea 
-                      placeholder="Describe the gift..." 
-                      className={themeStyles.input}
-                      value={newGift.description}
-                      onChange={(e : React.ChangeEvent<HTMLTextAreaElement>) => setNewGift({...newGift, description: e.target.value})}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className={themeStyles.primary}>Reaction</Label>
-                    <Textarea 
-                      placeholder="How did they react? How did it make you feel?" 
-                      className={themeStyles.input}
-                      value={newGift.reaction}
-                      onChange={(e : React.ChangeEvent<HTMLTextAreaElement>) => setNewGift({...newGift, reaction: e.target.value})}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className={themeStyles.primary}>Upload Photo</Label>
-                    <div className={`border-2 border-dashed rounded-md p-6 text-center ${themeStyles.buttonOutline} hover:cursor-pointer`}>
-                      <Camera className={`mx-auto h-8 w-8 mb-2 ${themeStyles.accent}`} />
-                      <p className={themeStyles.secondary}>Drop image here or click to upload</p>
+                  <div className="space-y-3">
+                    <div>
+                      <Label className={themeStyles.primary}>Description</Label>
+                      <Textarea 
+                        placeholder="Describe the gift..." 
+                        className={themeStyles.input}
+                        value={newGift.description}
+                        onChange={(e) => setNewGift({...newGift, description: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label className={themeStyles.primary}>Reaction</Label>
+                      <Textarea 
+                        placeholder="How did they react? How did it make you feel?" 
+                        className={themeStyles.input}
+                        value={newGift.reaction}
+                        onChange={(e) => setNewGift({...newGift, reaction: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="checkbox" 
+                        id="favorite" 
+                        checked={newGift.favorite}
+                        onChange={(e) => setNewGift({...newGift, favorite: e.target.checked})}
+                      />
+                      <Label htmlFor="favorite" className={themeStyles.primary}>
+                        Mark as favorite
+                      </Label>
                     </div>
                   </div>
                 </div>
-              </div>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" className={themeStyles.button} disabled={submitting}>
+                    {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Save Gift Memory
+                  </Button>
+                </div>
+              </form>
             </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button className={themeStyles.button}>Save Gift Memory</Button>
-            </CardFooter>
           </Card>
         </TabsContent>
 
         {/* Wishlist Tab */}
         <TabsContent value="wishlist" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className={themeStyles.card}>
-              <CardHeader>
-                <CardTitle className={themeStyles.title}>Your Wishlist</CardTitle>
-                <CardDescription className={themeStyles.secondary}>
-                  What you would love to receive
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[300px] pr-4">
-                  <div className="space-y-3">
-                    {wishlist.filter(item => item.person === "user").map(item => (
-                      <div key={item.id} className={`p-3 rounded-md ${themeStyles.highlight} mb-3`}>
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className={`font-medium ${themeStyles.title}`}>{item.item}</h4>
-                          {getPriorityBadge(item.priority)}
-                        </div>
-                        <p className={`text-sm mb-2 ${themeStyles.secondary}`}>{item.notes}</p>
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className={themeStyles.primary}>Surprise Level</span>
-                            <span className={themeStyles.accent}>{item.surprise}%</span>
-                          </div>
-                          <Progress value={item.surprise} max={100} className="h-2 bg-gray-200" />
-                        </div>
-                        <div className="flex gap-2 mt-3 justify-end">
-                          <Button variant="outline" size="sm" className={themeStyles.buttonOutline}>
-                            <Edit className="mr-1 h-3 w-3" />
-                            Edit
-                          </Button>
-                          <Button variant="outline" size="sm" className={themeStyles.buttonOutline}>
-                            <Trash className="mr-1 h-3 w-3" />
-                            Remove
-                          </Button>
-                        </div>
+            {wishlistItems.map(item => (
+              <Card key={item.id} className={`${themeStyles.card} ${themeStyles.cardHover} transition-all`}>
+                <CardHeader className={`${themeStyles.header} pb-2`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className={themeStyles.title}>{item.item}</CardTitle>
+                      <CardDescription className={themeStyles.secondary}>
+                        {getPriorityBadge(item.priority)}
+                      </CardDescription>
+                    </div>
+                    {item.gifted && (
+                      <Badge className="bg-green-500 text-white">Gifted</Badge>
+                    )}
+                    </div>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <div className="mb-4">
+                    <div className={`mb-2 ${themeStyles.primary}`}>
+                      <span className="font-semibold">Surprise Level:</span> {item.surprise}%
+                    </div>
+                    {item.notes && (
+                      <div className={`mt-3 p-3 italic rounded-md ${themeStyles.highlight}`}>
+                        "{item.notes}"
                       </div>
-                    ))}
+                    )}
                   </div>
-                </ScrollArea>
-              </CardContent>
-              <CardFooter>
-                <Button className={`w-full ${themeStyles.button}`}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add to Your Wishlist
-                </Button>
-              </CardFooter>
-            </Card>
-
-            <Card className={themeStyles.card}>
-              <CardHeader>
-                <CardTitle className={themeStyles.title}>Partner&apos;s Wishlist</CardTitle>
-                <CardDescription className={themeStyles.secondary}>
-                  What they would love to receive
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[300px] pr-4">
-                  <div className="space-y-3">
-                    {wishlist.filter(item => item.person === "partner").map(item => (
-                      <div key={item.id} className={`p-3 rounded-md ${themeStyles.highlight} mb-3`}>
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className={`font-medium ${themeStyles.title}`}>{item.item}</h4>
-                          {getPriorityBadge(item.priority)}
-                        </div>
-                        <p className={`text-sm mb-2 ${themeStyles.secondary}`}>{item.notes}</p>
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className={themeStyles.primary}>Surprise Level</span>
-                            <span className={themeStyles.accent}>{item.surprise}%</span>
-                          </div>
-                          <Progress value={item.surprise} max={100} className="h-2 bg-gray-200" />
-                        </div>
-                        <div className="flex gap-2 mt-3 justify-end">
-                          <Button variant="outline" size="sm" className={themeStyles.buttonOutline}>
-                            <Edit className="mr-1 h-3 w-3" />
-                            Edit
-                          </Button>
-                          <Button variant="outline" size="sm" className={themeStyles.buttonOutline}>
-                            <Gift className="mr-1 h-3 w-3" />
-                            Mark as Gifted
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-              <CardFooter>
-                <Button className={`w-full ${themeStyles.button}`}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add to Partner&apos;s Wishlist
-                </Button>
-              </CardFooter>
-            </Card>
+                </CardContent>
+                <CardFooter className={`${themeStyles.footer} pt-1 flex justify-between`}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={themeStyles.buttonOutline}
+                    onClick={() => markWishlistItemAsGifted(item.id)}
+                    disabled={item.gifted}
+                  >
+                    <Gift className="mr-1 h-3 w-3" />
+                    {item.gifted ? "Gifted" : "Mark as Gifted"}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={themeStyles.buttonOutline}
+                    onClick={() => deleteWishlistItem(item.id)}
+                  >
+                    <Trash className="mr-1 h-3 w-3" />
+                    Delete
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
           </div>
-
+          
           <Card className={themeStyles.card}>
             <CardHeader>
-              <CardTitle className={themeStyles.title}>Add New Wishlist Item</CardTitle>
+              <CardTitle className={themeStyles.title}>Add to Wishlist</CardTitle>
               <CardDescription className={themeStyles.secondary}>
-                Let your partner know what you desire
+                Add something you'd love to receive
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <div>
-                    <Label className={themeStyles.primary}>Item Name</Label>
-                    <Input 
-                      placeholder="What do you want?" 
-                      className={themeStyles.input}
-                      value={newWishlistItem.item}
-                      onChange={(e : React.ChangeEvent<HTMLInputElement>) => setNewWishlistItem({...newWishlistItem, item: e.target.value})}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className={themeStyles.primary}>Priority</Label>
-                    <Select 
-                      value={newWishlistItem.priority} 
-                      onValueChange={(value: string) => setNewWishlistItem({...newWishlistItem, priority: value})}
-                    >
-                      <SelectTrigger className={themeStyles.input}>
-                        <SelectValue placeholder="Select priority" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Must-Have">Must-Have</SelectItem>
-                        <SelectItem value="Would Love">Would Love</SelectItem>
-                        <SelectItem value="Nice to Have">Nice to Have</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className={themeStyles.primary}>Whose Wishlist?</Label>
-                    <Select 
-                      value={newWishlistItem.person} 
-                      onValueChange={(value: string) => setNewWishlistItem({...newWishlistItem, person: value})}
-                    >
-                      <SelectTrigger className={themeStyles.input}>
-                        <SelectValue placeholder="Select person" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="user">Your Wishlist</SelectItem>
-                        <SelectItem value="partner">Partner&apos;s Wishlist</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <Label className={themeStyles.primary}>Notes/Details</Label>
-                    <Textarea 
-                      placeholder="Any specific details about this item..." 
-                      className={themeStyles.input}
-                      value={newWishlistItem.notes}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewWishlistItem({...newWishlistItem, notes: e.target.value})}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className={themeStyles.primary}>
-                      Surprise Level: {newWishlistItem.surprise}%
-                    </Label>
-                    <div className="pt-2">
+              <form onSubmit={handleSubmitWishlistItem}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div>
+                      <Label className={themeStyles.primary}>Item</Label>
+                      <Input 
+                        placeholder="What would you like?" 
+                        className={themeStyles.input}
+                        value={newWishlistItem.item}
+                        onChange={(e) => setNewWishlistItem({...newWishlistItem, item: e.target.value})}
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label className={themeStyles.primary}>Priority</Label>
+                      <Select value={newWishlistItem.priority} onValueChange={(value) => setNewWishlistItem({...newWishlistItem, priority: value as any})}>
+                        <SelectTrigger className={themeStyles.input}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MUST_HAVE">Must Have</SelectItem>
+                          <SelectItem value="WOULD_LOVE">Would Love</SelectItem>
+                          <SelectItem value="NICE_TO_HAVE">Nice to Have</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label className={themeStyles.primary}>Surprise Level: {newWishlistItem.surprise}%</Label>
                       <input 
                         type="range" 
                         min="0" 
@@ -590,17 +975,28 @@ export default function GiftsPage() {
                         className="w-full"
                       />
                     </div>
-                    <div className="flex justify-between text-xs mt-1">
-                      <span className={themeStyles.secondary}>Tell me exactly what to get</span>
-                      <span className={themeStyles.secondary}>Surprise me completely</span>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <Label className={themeStyles.primary}>Notes</Label>
+                      <Textarea 
+                        placeholder="Any specific details, links, or notes..." 
+                        className={themeStyles.input}
+                        value={newWishlistItem.notes}
+                        onChange={(e) => setNewWishlistItem({...newWishlistItem, notes: e.target.value})}
+                      />
                     </div>
                   </div>
                 </div>
-              </div>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" className={themeStyles.button} disabled={submitting}>
+                    {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Add to Wishlist
+                  </Button>
+                </div>
+              </form>
             </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button className={themeStyles.button}>Add to Wishlist</Button>
-            </CardFooter>
           </Card>
         </TabsContent>
 
@@ -608,49 +1004,42 @@ export default function GiftsPage() {
         <TabsContent value="occasions" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {occasions.map(occasion => (
-              <Card key={occasion.id} className={themeStyles.card}>
-                <CardHeader className={`${themeStyles.header}`}>
+              <Card key={occasion.id} className={`${themeStyles.card} ${themeStyles.cardHover} transition-all`}>
+                <CardHeader className={`${themeStyles.header} pb-2`}>
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle className={themeStyles.title}>{occasion.title}</CardTitle>
                       <CardDescription className={themeStyles.secondary}>
-                        {occasion.date} • {occasion.daysLeft} days left
+                        {occasion.date} • {calculateDaysUntil(occasion.date) > 0 ? `${calculateDaysUntil(occasion.date)} days to go` : 'Today or past'}
                       </CardDescription>
                     </div>
-                    <Avatar className={isDark ? "bg-purple-700" : "bg-pink-100"}>
-                      <AvatarFallback className={isDark ? "text-white" : "text-pink-700"}>{occasion.daysLeft}</AvatarFallback>
-                    </Avatar>
+                    {occasion.budget && (
+                      <Badge className={themeStyles.buttonOutline}>
+                        <DollarSign className="mr-1 h-3 w-3" />
+                        ${occasion.budget}
+                      </Badge>
+                    )}
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className={`text-sm font-medium mb-2 ${themeStyles.primary}`}>Gift Ideas:</h4>
-                      <ul className="list-disc pl-5 space-y-1">
+                <CardContent className="pb-2">
+                  {occasion.suggestions.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className={`font-semibold mb-2 ${themeStyles.primary}`}>Gift Ideas:</h4>
+                      <ul className={`space-y-1 ${themeStyles.secondary}`}>
                         {occasion.suggestions.map((suggestion, index) => (
-                          <li key={index} className={themeStyles.secondary}>{suggestion}</li>
+                          <li key={index} className="flex items-center">
+                            <Sparkles className="mr-2 h-3 w-3" />
+                            {suggestion}
+                          </li>
                         ))}
                       </ul>
                     </div>
-                    
-                    <div>
-                      <h4 className={`text-sm font-medium mb-2 ${themeStyles.primary}`}>Budget Planning:</h4>
-                      <div className="flex items-center">
-                        <DollarSign className={`h-5 w-5 mr-1 ${themeStyles.accent}`} />
-                        <span className={`text-lg font-medium ${themeStyles.title}`}>${occasion.budget}</span>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
-                <CardFooter className={`${themeStyles.footer} flex justify-between`}>
-                  <Button variant="outline" className={themeStyles.buttonOutline}>
-                    <Edit className="mr-1 h-3 w-3" />
-                    Edit
-                  </Button>
-                  <Button className={themeStyles.button}>
-                    <Gift className="mr-1 h-3 w-3" />
-                    Plan Gift
-                  </Button>
+                <CardFooter className={`${themeStyles.footer} pt-1 flex justify-between`}>
+                  <Badge variant={occasion.reminder ? "default" : "secondary"}>
+                    {occasion.reminder ? "Reminder On" : "Reminder Off"}
+                  </Badge>
                 </CardFooter>
               </Card>
             ))}
@@ -658,357 +1047,328 @@ export default function GiftsPage() {
           
           <Card className={themeStyles.card}>
             <CardHeader>
-              <CardTitle className={themeStyles.title}>Add New Special Occasion</CardTitle>
+              <CardTitle className={themeStyles.title}>Add Special Occasion</CardTitle>
               <CardDescription className={themeStyles.secondary}>
-                Never miss an important date again
+                Plan ahead for important dates
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <div>
-                    <Label className={themeStyles.primary}>Occasion Name</Label>
-                    <Input placeholder="Anniversary, Birthday, etc." className={themeStyles.input} />
+              <form onSubmit={handleSubmitOccasion}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div>
+                      <Label className={themeStyles.primary}>Occasion</Label>
+                      <Input 
+                        placeholder="Birthday, Anniversary, etc." 
+                        className={themeStyles.input}
+                        value={newOccasion.title}
+                        onChange={(e) => setNewOccasion({...newOccasion, title: e.target.value})}
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label className={themeStyles.primary}>Date</Label>
+                      <Input 
+                        type="date" 
+                        className={themeStyles.input}
+                        value={newOccasion.date}
+                        onChange={(e) => setNewOccasion({...newOccasion, date: e.target.value})}
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label className={themeStyles.primary}>Budget</Label>
+                      <Input 
+                        type="number" 
+                        placeholder="Optional budget" 
+                        className={themeStyles.input}
+                        value={newOccasion.budget}
+                        onChange={(e) => setNewOccasion({...newOccasion, budget: e.target.value})}
+                      />
+                    </div>
                   </div>
                   
-                  <div>
-                    <Label className={themeStyles.primary}>Date</Label>
-                    <Input type="date" className={themeStyles.input} />
-                  </div>
-                  
-                  <div>
-                    <Label className={themeStyles.primary}>Budget</Label>
-                    <div className="relative">
-                      <DollarSign className={`absolute left-3 top-3 h-4 w-4 ${themeStyles.secondary}`} />
-                      <Input type="number" className={`${themeStyles.input} pl-9`} placeholder="0" />
+                  <div className="space-y-3">
+                    <div>
+                      <Label className={themeStyles.primary}>Gift Ideas</Label>
+                      <Textarea 
+                        placeholder="One idea per line..." 
+                        className={themeStyles.input}
+                        value={newOccasion.suggestions}
+                        onChange={(e) => setNewOccasion({...newOccasion, suggestions: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="checkbox" 
+                        id="reminder" 
+                        checked={newOccasion.reminder}
+                        onChange={(e) => setNewOccasion({...newOccasion, reminder: e.target.checked})}
+                      />
+                      <Label htmlFor="reminder" className={themeStyles.primary}>
+                        Set reminder
+                      </Label>
                     </div>
                   </div>
                 </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <Label className={themeStyles.primary}>Gift Ideas</Label>
-                    <Textarea 
-                      placeholder="List some gift ideas (one per line)" 
-                      className={`${themeStyles.input} h-32`} 
-                    />
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Switch id="reminder" />
-                    <Label htmlFor="reminder" className={themeStyles.primary}>
-                      Set reminder (2 weeks before)
-                    </Label>
-                  </div>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" className={themeStyles.button} disabled={submitting}>
+                    {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Add Occasion
+                  </Button>
                 </div>
-              </div>
+              </form>
             </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button className={themeStyles.button}>Save Occasion</Button>
-            </CardFooter>
           </Card>
         </TabsContent>
+
         {/* Thoughtful Ideas Tab */}
         <TabsContent value="ideas" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {thoughtfulIdeas.map(idea => (
-              <Card key={idea.id} className={themeStyles.card}>
-                <CardHeader className={themeStyles.header}>
+              <Card key={idea.id} className={`${themeStyles.card} ${themeStyles.cardHover} transition-all`}>
+                <CardHeader className={`${themeStyles.header} pb-2`}>
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle className={themeStyles.title}>{idea.title}</CardTitle>
-                      <CardDescription className={`flex items-center ${themeStyles.secondary}`}>
-                        <Badge className={isDark ? "bg-purple-600" : "bg-pink-400"}>
-                          {idea.type}
-                        </Badge>
+                      <CardDescription className={themeStyles.secondary}>
+                        <Badge variant="outline">{idea.type}</Badge>
+                        {idea.targetDate && (
+                          <span className="ml-2">Target: {idea.targetDate}</span>
+                        )}
                       </CardDescription>
                     </div>
-                    {idea.type === "DIY" && (
-                      <div className="text-right">
-                        <p className={`text-xs mb-1 ${themeStyles.secondary}`}>Progress</p>
-                        <Progress value={idea.progress} max={100} className="h-2 w-20 bg-gray-200" />
-                      </div>
+                    {idea.completed && (
+                      <Badge className="bg-green-500 text-white">Completed</Badge>
                     )}
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <p className={themeStyles.primary}>{idea.description}</p>
+                <CardContent className="pb-2">
+                  <p className={`mb-4 ${themeStyles.primary}`}>{idea.description}</p>
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className={`text-sm font-medium ${themeStyles.secondary}`}>
+                        Progress: {idea.progress}%
+                      </span>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className={themeStyles.buttonOutline}
+                        onClick={() => updateIdeaProgress(idea.id, Math.min(idea.progress + 10, 100))}
+                      >
+                        +10%
+                      </Button>
+                    </div>
+                    <Progress value={idea.progress} className="w-full" />
+                  </div>
                 </CardContent>
-                <CardFooter className={`${themeStyles.footer} flex justify-between`}>
-                  <Button variant="outline" className={themeStyles.buttonOutline}>
-                    <Edit className="mr-1 h-3 w-3" />
-                    Edit
-                  </Button>
-                  <Button className={themeStyles.button}>
-                    <Gift className="mr-1 h-3 w-3" />
-                    Start Project
-                  </Button>
-                </CardFooter>
               </Card>
             ))}
           </div>
           
           <Card className={themeStyles.card}>
             <CardHeader>
-              <CardTitle className={themeStyles.title}>Add New Thoughtful Idea</CardTitle>
+              <CardTitle className={themeStyles.title}>Add Thoughtful Idea</CardTitle>
               <CardDescription className={themeStyles.secondary}>
-                Track DIY projects and personalized gift ideas
+                Plan a meaningful gift or experience
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <div>
-                    <Label className={themeStyles.primary}>Idea Title</Label>
-                    <Input placeholder="Name your gift idea" className={themeStyles.input} />
-                  </div>
-                  
-                  <div>
-                    <Label className={themeStyles.primary}>Type</Label>
-                    <Select defaultValue="DIY">
-                      <SelectTrigger className={themeStyles.input}>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="DIY">DIY Project</SelectItem>
-                        <SelectItem value="Experience">Experience</SelectItem>
-                        <SelectItem value="Intimate">Intimate Gift</SelectItem>
-                        <SelectItem value="Personalized">Personalized Item</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className={themeStyles.primary}>Target Completion</Label>
-                    <Input type="date" className={themeStyles.input} />
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <Label className={themeStyles.primary}>Description</Label>
-                    <Textarea 
-                      placeholder="Describe your idea in detail..." 
-                      className={`${themeStyles.input} h-32`} 
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className={themeStyles.primary}>
-                      Progress (for DIY projects)
-                    </Label>
-                    <div className="pt-2">
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        defaultValue="0"
-                        className="w-full"
+              <form onSubmit={handleSubmitIdea}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div>
+                      <Label className={themeStyles.primary}>Title</Label>
+                      <Input 
+                        placeholder="What's your idea?" 
+                        className={themeStyles.input}
+                        value={newIdea.title}
+                        onChange={(e) => setNewIdea({...newIdea, title: e.target.value})}
+                        required
                       />
                     </div>
-                    <div className="flex justify-between text-xs mt-1">
-                      <span className={themeStyles.secondary}>Not Started</span>
-                      <span className={themeStyles.secondary}>Complete</span>
+                    
+                    <div>
+                      <Label className={themeStyles.primary}>Type</Label>
+                      <Select value={newIdea.type} onValueChange={(value) => setNewIdea({...newIdea, type: value as any})}>
+                        <SelectTrigger className={themeStyles.input}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="DIY">DIY</SelectItem>
+                          <SelectItem value="EXPERIENCE">Experience</SelectItem>
+                          <SelectItem value="INTIMATE">Intimate</SelectItem>
+                          <SelectItem value="PERSONALIZED">Personalized</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label className={themeStyles.primary}>Target Date</Label>
+                      <Input 
+                        type="date" 
+                        className={themeStyles.input}
+                        value={newIdea.targetDate}
+                        onChange={(e) => setNewIdea({...newIdea, targetDate: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <Label className={themeStyles.primary}>Description</Label>
+                      <Textarea 
+                        placeholder="Describe your idea in detail..." 
+                        className={themeStyles.input}
+                        value={newIdea.description}
+                        onChange={(e) => setNewIdea({...newIdea, description: e.target.value})}
+                        required
+                      />
                     </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button className={themeStyles.button}>Save Idea</Button>
-            </CardFooter>
-          </Card>
-          
-          <Card className={themeStyles.card}>
-            <CardHeader>
-              <CardTitle className={themeStyles.title}>Love Notes & Letters</CardTitle>
-              <CardDescription className={themeStyles.secondary}>
-                Sometimes words are the most intimate gift
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className={`p-4 rounded-md border ${themeStyles.highlight} border-dashed ${themeStyles.divider}`}>
-                  <h4 className={`font-medium mb-2 ${themeStyles.title}`}>Write a Love Letter</h4>
-                  <Textarea 
-                    placeholder="Dear love of my life..." 
-                    className={`${themeStyles.input} h-32 mb-3`} 
-                  />
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <input type="checkbox" id="secret-letter" className="mr-2" />
-                      <Label htmlFor="secret-letter" className={`text-sm ${themeStyles.primary}`}>
-                        Keep private until delivered
-                      </Label>
-                    </div>
-                    <Button className={themeStyles.button}>
-                      Save Letter
-                    </Button>
-                  </div>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" className={themeStyles.button} disabled={submitting}>
+                    {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Add Idea
+                  </Button>
                 </div>
-                
-                <div>
-                  <h4 className={`font-medium mb-3 ${themeStyles.title}`}>Your Saved Love Notes</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className={`p-3 rounded-md cursor-pointer ${themeStyles.highlight} hover:shadow-md transition-all`}>
-                      <p className={`italic text-sm ${themeStyles.secondary}`}>&quot;For when you need a reminder of how much I cherish you...&quot;</p>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className={`text-xs ${themeStyles.accent}`}>Saved 3 days ago</span>
-                        <Heart className={`h-4 w-4 ${themeStyles.flame}`} />
-                      </div>
-                    </div>
-                    <div className={`p-3 rounded-md cursor-pointer ${themeStyles.highlight} hover:shadow-md transition-all`}>
-                      <p className={`italic text-sm ${themeStyles.secondary}`}>&quot;Tonight, I want to show you just how much you mean to me...&quot;</p>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className={`text-xs ${themeStyles.accent}`}>Saved 1 week ago</span>
-                        <LockIcon className={`h-4 w-4 ${themeStyles.flame}`} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Secret Plans Tab */}
         <TabsContent value="secret" className="space-y-4">
-          <Card className={themeStyles.card}>
-            <CardHeader className="text-center">
-              <LockIcon className={`mx-auto h-8 w-8 mb-2 ${themeStyles.accent}`} />
-              <CardTitle className={themeStyles.title}>Secret Gift Planning</CardTitle>
-              <CardDescription className={themeStyles.secondary}>
-                Your partner can&apos;t see what you add here
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className={`p-4 rounded-md border text-center ${themeStyles.highlight} border-dashed ${themeStyles.divider}`}>
-                <h4 className={`font-medium mb-3 ${themeStyles.title}`}>Your Secret Gift Plans</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className={`p-3 rounded-md ${isDark ? "bg-zinc-700" : "bg-white"} shadow-sm`}>
-                    <h5 className={`font-medium ${themeStyles.title}`}>Anniversary Surprise</h5>
-                    <p className={`text-sm mt-2 ${themeStyles.secondary}`}>
-                      Book the cabin retreat + champagne delivery
-                    </p>
-                    <div className="mt-3">
-                      <Progress value={60} max={100} className="h-2 bg-gray-200" />
-                      <p className={`text-xs mt-1 ${themeStyles.accent}`}>Progress: 60%</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {secretPlans.map(plan => (
+              <Card key={plan.id} className={`${themeStyles.card} ${themeStyles.cardHover} transition-all`}>
+                <CardHeader className={`${themeStyles.header} pb-2`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className={`${themeStyles.title} flex items-center`}>
+                        <LockIcon className="mr-2 h-4 w-4" />
+                        {plan.title}
+                      </CardTitle>
+                      <CardDescription className={themeStyles.secondary}>
+                        {plan.targetDate && `Target: ${plan.targetDate}`}
+                        {plan.budget && (
+                          <Badge className={`ml-2 ${themeStyles.buttonOutline}`}>
+                            <DollarSign className="mr-1 h-3 w-3" />
+                            ${plan.budget}
+                          </Badge>
+                        )}
+                      </CardDescription>
                     </div>
-                    <div className="flex justify-end mt-3">
-                      <Button variant="outline" size="sm" className={themeStyles.buttonOutline}>
-                        Edit Plan
-                      </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  {plan.description && (
+                    <p className={`mb-4 ${themeStyles.primary}`}>{plan.description}</p>
+                  )}
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className={`text-sm font-medium ${themeStyles.secondary}`}>
+                        Progress: {plan.progress}%
+                      </span>
                     </div>
+                    <Progress value={plan.progress} className="w-full" />
                   </div>
                   
-                  <div className={`p-3 rounded-md ${isDark ? "bg-zinc-700" : "bg-white"} shadow-sm`}>
-                    <h5 className={`font-medium ${themeStyles.title}`}>Birthday Gift Collection</h5>
-                    <div className="space-y-2 mt-2">
-                      <div className="flex justify-between">
-                        <span className={`text-sm ${themeStyles.secondary}`}>Leather journal</span>
-                        <span className={`text-xs ${themeStyles.accent}`}>✓ Purchased</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={`text-sm ${themeStyles.secondary}`}>Massage oil set</span>
-                        <span className={`text-xs ${themeStyles.accent}`}>✓ Purchased</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={`text-sm ${themeStyles.secondary}`}>Custom playlist</span>
-                        <span className={`text-xs ${themeStyles.accent}`}>In progress</span>
-                      </div>
+                  {getItemsForSecretPlan(plan.id).length > 0 && (
+                    <div className="mt-4">
+                      <h4 className={`font-semibold mb-2 ${themeStyles.primary}`}>Tasks:</h4>
+                      <ul className={`space-y-1 ${themeStyles.secondary}`}>
+                        {getItemsForSecretPlan(plan.id).map((item, index) => (
+                          <li key={index} className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              checked={item.completed}
+                              onChange={() => {/* Handle task toggle */}}
+                              className="mr-2"
+                            />
+                            <span className={item.completed ? "line-through opacity-50" : ""}>
+                              {item.item}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <div className="flex justify-end mt-3">
-                      <Button variant="outline" size="sm" className={themeStyles.buttonOutline}>
-                        Edit Items
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                
-                <Button className={`mx-auto ${themeStyles.button}`}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Create New Secret Plan
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
           
           <Card className={themeStyles.card}>
             <CardHeader>
-              <CardTitle className={themeStyles.title}>Collaborative Gifts</CardTitle>
+              <CardTitle className={`${themeStyles.title} flex items-center`}>
+                <LockIcon className="mr-2 h-4 w-4" />
+                Create Secret Plan
+              </CardTitle>
               <CardDescription className={themeStyles.secondary}>
-                Plan joint gifts for friends and family
+                Plan something special in secret
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className={`p-4 rounded-md ${themeStyles.highlight}`}>
-                  <div className="flex justify-between items-start mb-3">
+              <form onSubmit={handleSubmitSecretPlan}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
                     <div>
-                      <h4 className={`font-medium ${themeStyles.title}`}>Mom&apos;s 60th Birthday</h4>
-                      <p className={`text-sm ${themeStyles.secondary}`}>May 15, 2025</p>
+                      <Label className={themeStyles.primary}>Plan Title</Label>
+                      <Input 
+                        placeholder="What's your secret plan?" 
+                        className={themeStyles.input}
+                        value={newSecretPlan.title}
+                        onChange={(e) => setNewSecretPlan({...newSecretPlan, title: e.target.value})}
+                        required
+                      />
                     </div>
-                    <Badge className={isDark ? "bg-purple-500" : "bg-pink-500"}>
-                      Shared
-                    </Badge>
-                  </div>
-                  
-                  <div className="space-y-2 mb-3">
-                    <h5 className={`text-sm font-medium ${themeStyles.primary}`}>Gift Ideas:</h5>
-                    <div className="pl-3 space-y-1">
-                      <div className="flex items-center">
-                        <input type="radio" id="idea1" name="momGift" className="mr-2" />
-                        <Label htmlFor="idea1" className={themeStyles.secondary}>
-                          Weekend spa package
-                        </Label>
-                      </div>
-                      <div className="flex items-center">
-                        <input type="radio" id="idea2" name="momGift" className="mr-2" />
-                        <Label htmlFor="idea2" className={themeStyles.secondary}>
-                          Kitchen renovation contribution
-                        </Label>
-                      </div>
-                      <div className="flex items-center">
-                        <input type="radio" id="idea3" name="momGift" className="mr-2" checked />
-                        <Label htmlFor="idea3" className={themeStyles.secondary}>
-                          Family photo album + dinner
-                        </Label>
-                      </div>
+                    
+                    <div>
+                      <Label className={themeStyles.primary}>Budget</Label>
+                      <Input 
+                        type="number" 
+                        placeholder="Optional budget" 
+                        className={themeStyles.input}
+                        value={newSecretPlan.budget}
+                        onChange={(e) => setNewSecretPlan({...newSecretPlan, budget: e.target.value})}
+                      />
                     </div>
-                  </div>
-                  
-                  <div className={`p-3 rounded-md ${isDark ? "bg-zinc-700/50" : "bg-white"} mt-4`}>
-                    <h5 className={`text-sm font-medium mb-2 ${themeStyles.primary}`}>
-                      Budget & Contributions:
-                    </h5>
-                    <div className="space-y-1 mb-3">
-                      <div className="flex justify-between text-sm">
-                        <span className={themeStyles.secondary}>Total Budget:</span>
-                        <span className={themeStyles.title}>$400</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className={themeStyles.secondary}>You:</span>
-                        <span className={themeStyles.title}>$200</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className={themeStyles.secondary}>Partner:</span>
-                        <span className={themeStyles.title}>$200</span>
-                      </div>
+                    
+                    <div>
+                      <Label className={themeStyles.primary}>Target Date</Label>
+                      <Input 
+                        type="date" 
+                        className={themeStyles.input}
+                        value={newSecretPlan.targetDate}
+                        onChange={(e) => setNewSecretPlan({...newSecretPlan, targetDate: e.target.value})}
+                      />
                     </div>
                   </div>
                   
-                  <div className="flex justify-end mt-3">
-                    <Button className={themeStyles.button}>
-                      Update Plan
-                    </Button>
+                  <div className="space-y-3">
+                    <div>
+                      <Label className={themeStyles.primary}>Description</Label>
+                      <Textarea 
+                        placeholder="Secret plan details..." 
+                        className={themeStyles.input}
+                        value={newSecretPlan.description}
+                        onChange={(e) => setNewSecretPlan({...newSecretPlan, description: e.target.value})}
+                      />
+                    </div>
                   </div>
                 </div>
-                
-                <Button className={`w-full ${themeStyles.buttonOutline}`} variant="outline">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  New Collaborative Gift
-                </Button>
-              </div>
+                <div className="flex justify-end mt-4">
+                  <Button type="submit" className={themeStyles.button} disabled={submitting}>
+                    {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Create Secret Plan
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1016,157 +1376,58 @@ export default function GiftsPage() {
         {/* Favorites Tab */}
         <TabsContent value="favorites" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className={themeStyles.card}>
-              <CardHeader>
-                <CardTitle className={themeStyles.title}>Most Memorable Gifts</CardTitle>
-                <CardDescription className={themeStyles.secondary}>
-                  Your all-time favorites
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className={`p-4 rounded-md ${themeStyles.highlight} relative`}>
-                    <div className="absolute top-2 right-2">
-                      <Star className="h-5 w-5 fill-current text-yellow-500" />
+            {getFavoriteGifts().map(gift => (
+              <Card key={gift.id} className={`${themeStyles.card} ${themeStyles.cardHover} transition-all`}>
+                <CardHeader className={`${themeStyles.header} pb-2`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className={`${themeStyles.title} flex items-center`}>
+                        <Heart className="mr-2 h-4 w-4 fill-current text-red-500" />
+                        {gift.giftName}
+                      </CardTitle>
+                      <CardDescription className={themeStyles.secondary}>
+                        {gift.date} • {gift.occasion}
+                      </CardDescription>
                     </div>
-                    <h4 className={`font-medium ${themeStyles.title} pr-7`}>Silk Lingerie Set</h4>
-                    <p className={`text-sm ${themeStyles.secondary} mb-2`}>
-                      Valentine&apos;s Day • 2025
-                    </p>
-                    <div className={`italic text-sm p-2 rounded-md ${isDark ? "bg-zinc-700/50" : "bg-white"}`}>
-                      &quot;The way her eyes lit up when she opened the box... unforgettable moment.&quot;
+                    <Star className="h-5 w-5 fill-current text-yellow-500" />
+                  </div>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <p className={`mb-2 ${themeStyles.primary}`}>
+                    <span className="font-semibold">Description:</span> {gift.description}
+                  </p>
+                  {gift.reaction && (
+                    <div className={`mt-3 p-3 italic rounded-md ${themeStyles.highlight}`}>
+                      "{gift.reaction}"
                     </div>
-                  </div>
-                  
-                  <div className={`p-4 rounded-md ${themeStyles.highlight} relative`}>
-                    <div className="absolute top-2 right-2">
-                      <Star className="h-5 w-5 fill-current text-yellow-500" />
-                    </div>
-                    <h4 className={`font-medium ${themeStyles.title} pr-7`}>Couples Massage Package</h4>
-                    <p className={`text-sm ${themeStyles.secondary} mb-2`}>
-                      Date Night • 2025
-                    </p>
-                    <div className={`italic text-sm p-2 rounded-md ${isDark ? "bg-zinc-700/50" : "bg-white"}`}>
-                      &quot;Perfect combination of relaxation and intimacy. Led to one of our most connected evenings.&quot;
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className={themeStyles.card}>
-              <CardHeader>
-                <CardTitle className={themeStyles.title}>Gift Insights</CardTitle>
-                <CardDescription className={themeStyles.secondary}>
-                  What works best for your relationship
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <h4 className={`font-medium mb-2 ${themeStyles.title}`}>What They Love:</h4>
-                    <ul className={`list-disc pl-5 ${themeStyles.primary}`}>
-                      <li>Experiences over objects</li>
-                      <li>Intimate apparel & accessories</li>
-                      <li>Handwritten notes & personalized touches</li>
-                      <li>Surprises that show deep attention to detail</li>
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h4 className={`font-medium mb-2 ${themeStyles.title}`}>What Doesn&apos;t Work:</h4>
-                    <ul className={`list-disc pl-5 ${themeStyles.primary}`}>
-                      <li>Generic gift cards</li>
-                      <li>Practical household items</li>
-                      <li>Last-minute selections</li>
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h4 className={`font-medium mb-2 ${themeStyles.title}`}>Best Gift Categories:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge className={isDark ? "bg-purple-700" : "bg-pink-500"}>
-                        <Sparkles className="mr-1 h-3 w-3" />
-                        Intimate
-                      </Badge>
-                      <Badge className={isDark ? "bg-purple-700" : "bg-pink-500"}>
-                        <Sparkles className="mr-1 h-3 w-3" />
-                        Experiential
-                      </Badge>
-                      <Badge className={isDark ? "bg-purple-700" : "bg-pink-500"}>
-                        <Sparkles className="mr-1 h-3 w-3" />
-                        Handmade
-                      </Badge>
-                      <Badge className={isDark ? "bg-purple-700" : "bg-pink-500"}>
-                        <Sparkles className="mr-1 h-3 w-3" />
-                        Thoughtful
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+                <CardFooter className={`${themeStyles.footer} pt-1 flex justify-between`}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={themeStyles.buttonOutline}
+                    onClick={() => toggleGiftFavorite(gift.id)}
+                  >
+                    <Heart className="mr-1 h-3 w-3 fill-current" />
+                    Unfavorite
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
           </div>
           
-          <Card className={themeStyles.card}>
-            <CardHeader>
-              <CardTitle className={themeStyles.title}>Relationship Gift Timeline</CardTitle>
-              <CardDescription className={themeStyles.secondary}>
-                Your journey of giving together
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pb-6">
-              <div className="relative">
-                <div className={`absolute left-4 top-0 bottom-0 w-0.5 ${isDark ? "bg-purple-700" : "bg-pink-300"}`}></div>
-                
-                <div className="space-y-8 relative">
-                  <div className="ml-10 relative">
-                    <div className={`absolute -left-10 w-4 h-4 rounded-full top-1.5 ${isDark ? "bg-purple-500" : "bg-pink-500"}`}></div>
-                    <h4 className={`font-medium ${themeStyles.title}`}>First Gift Exchange</h4>
-                    <p className={`text-sm ${themeStyles.secondary}`}>November 2023</p>
-                    <div className={`mt-2 p-3 rounded-md ${themeStyles.highlight}`}>
-                      <p className={themeStyles.primary}>
-                        Handwritten poem & dinner reservation
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="ml-10 relative">
-                    <div className={`absolute -left-10 w-4 h-4 rounded-full top-1.5 ${isDark ? "bg-purple-500" : "bg-pink-500"}`}></div>
-                    <h4 className={`font-medium ${themeStyles.title}`}>First Anniversary</h4>
-                    <p className={`text-sm ${themeStyles.secondary}`}>April 2024</p>
-                    <div className={`mt-2 p-3 rounded-md ${themeStyles.highlight}`}>
-                      <p className={themeStyles.primary}>
-                        Weekend trip & custom photo album
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="ml-10 relative">
-                    <div className={`absolute -left-10 w-4 h-4 rounded-full top-1.5 ${isDark ? "bg-purple-500" : "bg-pink-500"}`}></div>
-                    <h4 className={`font-medium ${themeStyles.title}`}>Moving In Together</h4>
-                    <p className={`text-sm ${themeStyles.secondary}`}>September 2024</p>
-                    <div className={`mt-2 p-3 rounded-md ${themeStyles.highlight}`}>
-                      <p className={themeStyles.primary}>
-                        Bedroom accessories & intimate care package
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="ml-10 relative">
-                    <div className={`absolute -left-10 w-4 h-4 rounded-full top-1.5 ${isDark ? "bg-purple-600 border-2 border-purple-300" : "bg-pink-600 border-2 border-pink-200"}`}></div>
-                    <h4 className={`font-medium ${themeStyles.title}`}>Today</h4>
-                    <p className={`text-sm ${themeStyles.secondary}`}>March 2025</p>
-                    <div className={`mt-2 p-3 rounded-md ${themeStyles.highlight}`}>
-                      <p className={themeStyles.primary}>
-                        Planning your next special surprise...
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {getFavoriteGifts().length === 0 && (
+            <Card className={themeStyles.card}>
+              <CardContent className="text-center py-8">
+                <Heart className={`mx-auto h-12 w-12 mb-4 ${themeStyles.accent}`} />
+                <p className={`text-lg font-medium ${themeStyles.title}`}>No favorite gifts yet</p>
+                <p className={themeStyles.secondary}>
+                  Mark gifts as favorites to see them here
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
