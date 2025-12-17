@@ -1,46 +1,48 @@
-
 import { NextRequest, NextResponse } from 'next/server'
-import  getServerSession  from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-// app/api/user/partner/invitations/[id]/decline/route.ts
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export const runtime = 'nodejs'
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const session = await auth();
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const invitationId = params.id
-
-    const invitation = await prisma.partnerInvitation.findUnique({
-      where: { id: invitationId }
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
     })
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
 
-    if (!invitation) {
+    const { id } = await params
+
+    const relationship = await prisma.relationship.findUnique({
+      where: { id }
+    })
+    if (!relationship) {
       return NextResponse.json({ error: 'Invitation not found' }, { status: 404 })
     }
 
-    if (invitation.status !== 'PENDING') {
+    if (relationship.status !== 'PENDING') {
       return NextResponse.json({ error: 'Invitation is no longer valid' }, { status: 400 })
     }
 
-    // Verify the invitation is for the current user
-    if (invitation.receiverId !== session.user.id && invitation.email !== session.user.email) {
+    // Only the invitee (partnerId) can decline
+    if (relationship.partnerId !== currentUser.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Decline the invitation
-    await prisma.partnerInvitation.update({
-      where: { id: invitationId },
-      data: { 
-        status: 'DECLINED',
-        receiverId: session.user.id
-      }
-    })
+    // Delete the pending relationship to allow future invites
+    await prisma.relationship.delete({ where: { id } })
 
-    return NextResponse.json({ message: 'Partner invitation declined' })
+    return NextResponse.json({ message: 'Invitation declined' })
   } catch (error) {
     console.error('Error declining invitation:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

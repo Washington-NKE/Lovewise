@@ -1,59 +1,50 @@
-
 import { NextRequest, NextResponse } from 'next/server'
-import getServerSession  from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-// app/api/user/partner/invitations/[id]/accept/route.ts
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export const runtime = 'nodejs'
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const session = await auth()
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const invitationId = params.id
-
-    const invitation = await prisma.partnerInvitation.findUnique({
-      where: { id: invitationId },
-      include: { sender: true }
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
     })
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
 
-    if (!invitation) {
+    const { id } = await params
+
+    const relationship = await prisma.relationship.findUnique({
+      where: { id }
+    })
+    if (!relationship) {
       return NextResponse.json({ error: 'Invitation not found' }, { status: 404 })
     }
 
-    if (invitation.status !== 'PENDING') {
+    if (relationship.status !== 'PENDING') {
       return NextResponse.json({ error: 'Invitation is no longer valid' }, { status: 400 })
     }
 
-    // Verify the invitation is for the current user
-    if (invitation.receiverId !== session.user.id && invitation.email !== session.user.email) {
+    // Only the invitee (partnerId) can accept
+    if (relationship.partnerId !== currentUser.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Accept the invitation and create partner connection
-    await prisma.$transaction([
-      // Update invitation status
-      prisma.partnerInvitation.update({
-        where: { id: invitationId },
-        data: { 
-          status: 'ACCEPTED',
-          receiverId: session.user.id
-        }
-      }),
-      // Create bidirectional partner relationship
-      prisma.user.update({
-        where: { id: session.user.id },
-        data: { partnerId: invitation.senderId }
-      }),
-      prisma.user.update({
-        where: { id: invitation.senderId },
-        data: { partnerId: session.user.id }
-      })
-    ])
+    await prisma.relationship.update({
+      where: { id },
+      data: { status: 'ACTIVE', anniversaryDate: new Date() }
+    })
 
-    return NextResponse.json({ message: 'Partner invitation accepted successfully' })
+    return NextResponse.json({ message: 'Invitation accepted' })
   } catch (error) {
     console.error('Error accepting invitation:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
