@@ -2,18 +2,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
+
+export const runtime = 'nodejs'
 // Get all secret plan items for the authenticated user
 export async function GET() {
   try {
     const session = await auth()
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+    if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const secretPlanItems = await prisma.secretPlanItem.findMany({
       where: {
         plan: {
-          userId: session.user.id
+          userId: currentUser.id
         }
       },
       include: {
@@ -40,7 +50,14 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+    if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -57,15 +74,17 @@ export async function POST(request: NextRequest) {
       select: { userId: true }
     })
 
-    if (!secretPlan || secretPlan.userId !== session.user.id) {
+    if (!secretPlan || secretPlan.userId !== currentUser.id) {
       return NextResponse.json({ error: 'Secret plan not found' }, { status: 404 })
     }
 
     const secretPlanItem = await prisma.secretPlanItem.create({
       data: {
-        secretPlanId,
+        // Connect to the required relation via `plan`
+        plan: { connect: { id: secretPlanId } },
         item,
-        cost,
+        // Ensure Decimal compatibility if provided
+        cost: cost !== undefined && cost !== null ? new Prisma.Decimal(cost) : undefined,
         notes,
         completed: false
       }
