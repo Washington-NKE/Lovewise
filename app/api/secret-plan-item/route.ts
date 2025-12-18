@@ -80,8 +80,10 @@ export async function POST(request: NextRequest) {
 
     const secretPlanItem = await prisma.secretPlanItem.create({
       data: {
-        // Connect to the required relation via `plan`
+        // Connect the required relation via `plan`
         plan: { connect: { id: secretPlanId } },
+        // Also set the required scalar field present in schema
+        secretPlanId: secretPlanId,
         item,
         // Ensure Decimal compatibility if provided
         cost: cost !== undefined && cost !== null ? new Prisma.Decimal(cost) : undefined,
