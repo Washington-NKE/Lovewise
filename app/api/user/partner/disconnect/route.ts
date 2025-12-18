@@ -1,41 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function POST(request: NextRequest) {
+export const runtime = 'nodejs'
+
+export async function POST() {
   try {
     const session = await auth()
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Find the user and their active relationship
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: {
-        relationships: {
-          where: {
-            OR: [
-              { userId: session.user.id, status: 'ACTIVE' },
-              { partnerId: session.user.id, status: 'ACTIVE' }
-            ]
-          },
-          select: {
-            id: true,
-            userId: true,
-            partnerId: true,
-            status: true
-          }
-        }
-      }
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email }
     })
 
-    if (!user) {
+    if (!currentUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Check if user has an active relationship
-    const activeRelationship = user.relationships[0]
+    // Find active relationship involving this user
+    const activeRelationship = await prisma.relationship.findFirst({
+      where: {
+        status: 'ACTIVE',
+        OR: [{ userId: currentUser.id }, { partnerId: currentUser.id }]
+      }
+    })
+
     if (!activeRelationship) {
       return NextResponse.json(
         { error: 'No active relationship found' },
@@ -44,27 +35,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Get partner ID (could be either userId or partnerId in the relationship)
-    const partnerId = 
-      activeRelationship.userId === session.user.id
+    const partnerId =
+      activeRelationship.userId === currentUser.id
         ? activeRelationship.partnerId
         : activeRelationship.userId
 
     // Execute all updates in a transaction
     await prisma.$transaction([
-      // Update both users' partnerId to null
+      // Clear love pact for both users
       prisma.user.update({
-        where: { id: session.user.id },
-        data: { partnerId: null, lovePactId: null }
+        where: { id: currentUser.id },
+        data: { lovePactId: null }
       }),
       prisma.user.update({
         where: { id: partnerId },
-        data: { partnerId: null, lovePactId: null }
+        data: { lovePactId: null }
       }),
-      
+
       // Update the relationship status to ENDED
       prisma.relationship.update({
         where: { id: activeRelationship.id },
-        data: { status: 'ENDED', endedAt: new Date() }
+        data: { status: 'ENDED' }
       })
     ])
 
