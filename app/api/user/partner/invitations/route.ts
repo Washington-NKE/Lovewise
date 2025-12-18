@@ -1,30 +1,29 @@
+import { NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
+export const runtime = 'nodejs'
 
-// app/api/user/partner/invitations/route.ts
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const session = await auth()
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const invitations = await prisma.partnerInvitation.findMany({
-      where: {
-        OR: [
-          { receiverId: session.user.id },
-          { email: session.user.email }
-        ],
-        status: 'PENDING'
-      },
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true, email: true }
+    })
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // If you have a PartnerInvitation model:
+    const invitations = await prisma.relationship.findMany({
+      where: { status: 'PENDING', partnerId: currentUser.id },
       include: {
-        sender: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
-          }
-        }
+        user: { select: { id: true, name: true, email: true } } // inviter
       },
       orderBy: { createdAt: 'desc' }
     })

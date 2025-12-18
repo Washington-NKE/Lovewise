@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import getServerSession  from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-// app/api/user/partner/invite/route.ts
+export const runtime = 'nodejs'
+
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const session = await auth()
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true, email: true }
+    })
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     const body = await request.json()
@@ -19,22 +27,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is trying to invite themselves
-    if (email === session.user.email) {
+    if (email === currentUser.email) {
       return NextResponse.json({ error: 'Cannot invite yourself' }, { status: 400 })
-    }
-
-    // Check if invitation already exists
-    const existingInvitation = await prisma.partnerInvitation.findUnique({
-      where: {
-        senderId_email: {
-          senderId: session.user.id,
-          email: email
-        }
-      }
-    })
-
-    if (existingInvitation) {
-      return NextResponse.json({ error: 'Invitation already sent to this email' }, { status: 400 })
     }
 
     // Check if the email belongs to an existing user
@@ -42,22 +36,51 @@ export async function POST(request: NextRequest) {
       where: { email }
     })
 
-    // Create invitation
-    const invitation = await prisma.partnerInvitation.create({
+    if (!targetUser) {
+      return NextResponse.json({ error: 'User with this email not found' }, { status: 404 })
+    }
+
+    // Check if already in a relationship with this user
+    const existingRelationship = await prisma.relationship.findFirst({
+      where: {
+        OR: [
+          { userId: currentUser.id, partnerId: targetUser.id },
+          { userId: targetUser.id, partnerId: currentUser.id }
+        ]
+      }
+    })
+
+    if (existingRelationship) {
+      if (existingRelationship.status === 'ACTIVE') {
+        return NextResponse.json({ error: 'You are already connected with this user' }, { status: 400 })
+      }
+      if (existingRelationship.status === 'PENDING') {
+        return NextResponse.json({ error: 'Invitation already pending' }, { status: 400 })
+      }
+    }
+
+    // Create pending relationship (invitation)
+    const invitation = await prisma.relationship.create({
       data: {
-        email,
-        senderId: session.user.id,
-        receiverId: targetUser?.id,
+        userId: currentUser.id,
+        partnerId: targetUser.id,
         status: 'PENDING'
+      },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true, profileImage: true }
+        },
+        partner: {
+          select: { id: true, name: true, email: true, profileImage: true }
+        }
       }
     })
 
     // TODO: Send email notification to the invited user
-    // This would typically involve using a service like SendGrid, Resend, etc.
 
     return NextResponse.json({ 
       message: 'Invitation sent successfully',
-      invitationId: invitation.id 
+      invitation
     })
   } catch (error) {
     console.error('Error sending partner invitation:', error)
