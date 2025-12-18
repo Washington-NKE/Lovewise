@@ -532,7 +532,7 @@ const getIconByKeywords = (title: string, description: string) => {
   return Heart // Default icon
 }
 
-export function EventCard({ event, isHovered, onHover, onLeave }: { 
+function EventCard({ event, isHovered, onHover, onLeave }: { 
   event: DBEvent; 
   isHovered: boolean;
   onHover: () => void;
