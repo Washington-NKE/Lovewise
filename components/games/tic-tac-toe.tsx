@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, MessageCircle, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { GameClient } from '@/lib/game-client'
-import {getSession} from ''
+import { getSession } from 'next-auth/react'
 
 interface TicTacToeProps {
   gameSessionId: string;
@@ -104,10 +104,11 @@ useEffect(() => {
     } else {
       setPlayerSymbol('promise');
     }
-  } catch (e) {
+  } catch (error) {
     // Fallback to simple string comparison if localeCompare fails
     if (userId < partnerId) {
       setPlayerSymbol('heart');
+    console.error('🎮 localeCompare error, fallback to simple comparison:', error);
     } else {
       setPlayerSymbol('promise');
     }

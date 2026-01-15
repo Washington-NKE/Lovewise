@@ -17,7 +17,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { toast} from 'sonner'
 import { Plus, Heart, Calendar, Lock, Bookmark, Eye, EyeOff, Sparkles, Loader2, Trash, MoreVertical, Edit, X } from 'lucide-react'
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { 
   getJournalEntries, 
   getSharedJournalEntries, 
@@ -143,7 +143,7 @@ export default function JournalPage() {
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<JournalFormData>({
     title: '',
     content: '',
     mood: '',
@@ -208,6 +208,7 @@ export default function JournalPage() {
       setShowCreateForm(false);
     } catch (error) {
       toast.error('Failed to create journal entry');
+      console.error('Error creating journal entry:', error);
     } finally {
       setCreating(false);
     }
@@ -244,6 +245,7 @@ export default function JournalPage() {
       setEditingEntry(null);
     } catch (error) {
       toast.error('Failed to update journal entry');
+      console.error('Error updating journal entry:', error);
     } finally {
       setCreating(false);
     }
@@ -257,6 +259,7 @@ export default function JournalPage() {
       toast.success('Journal entry deleted successfully!');
     } catch (error) {
       toast.error('Failed to delete journal entry');
+      console.error('Error deleting journal entry:', error);
     }
   };
 
@@ -282,11 +285,6 @@ export default function JournalPage() {
     setShowEntryModal(true);
   };
 
-  const fadeIn = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
-  };
-  
   const heartBeat = {
     initial: { scale: 1 },
     pulse: { scale: 1.15, transition: { duration: 0.3, yoyo: Infinity } }
@@ -424,6 +422,13 @@ export default function JournalPage() {
   );
 }
 
+interface JournalFormData {
+  title: string;
+  content: string;
+  mood: string;
+  isPrivate: boolean;
+}
+
 // Form Modal Component
 function FormModal({
   title,
@@ -435,8 +440,8 @@ function FormModal({
   isEditing
 }: {
   title: string;
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: JournalFormData;
+  setFormData: React.Dispatch<React.SetStateAction<JournalFormData>>;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
   creating: boolean;
@@ -482,6 +487,7 @@ function FormModal({
                   id="title" 
                   value={formData.title}
                   onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  disabled={creating}
                   placeholder="Give your memory a title..." 
                   className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 transition-all duration-300"
                   required
@@ -853,7 +859,7 @@ function EntryActionsMenu({ entry, onEdit, onDelete }: {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure you want to delete this memory?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete "{entry.title}" and remove it from your journal.
+                This action cannot be undone. It will permanently delete {entry.title} from your journal.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

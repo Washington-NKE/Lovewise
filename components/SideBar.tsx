@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, type AnchorHTMLAttributes } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -48,8 +48,8 @@ import { signOutAction } from "@/lib/actions/auth"
 interface Partner {
   id: string
   name: string
-  profileImage?: string
-  lastActive?: Date
+  profileImage?: string | null
+  lastActive?: Date | null
   isOnline?: boolean
 }
 
@@ -77,11 +77,13 @@ const MobileSidebarTrigger = () => {
 }
 
 // Custom Link component that closes mobile sidebar on navigation
-const SidebarLink = ({ href, children, className, ...props }: { 
-  href: string; 
-  children: React.ReactNode; 
+type SidebarLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  href: string;
+  children: React.ReactNode;
   className?: string;
-}) => {
+}
+
+const SidebarLink: React.FC<SidebarLinkProps> = ({ href, children, className, ...props }) => {
   const { setOpenMobile, isMobile } = useSidebar()
   
   const handleClick = () => {

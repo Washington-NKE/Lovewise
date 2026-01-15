@@ -30,13 +30,13 @@ export default async function DashboardLayout({
   // Get partner information using the correct user ID
   let partner = await getPartnerInfo(currentUser.id)
 
-  // console.log("Partner query by Washington:", partner)
-  // console.log("Session query by Washington:", session)
-  // console.log("Current user query by Washington:", currentUser)
-
-  // Normalize partner.profileImage: convert null to undefined
-  if (partner && partner.profileImage === null) {
-    partner = { ...partner, profileImage: undefined };
+  // Normalize nullable fields for the client component expectations
+  if (partner) {
+    partner = {
+      ...partner,
+      profileImage: partner.profileImage ?? undefined,
+      lastActive: partner.lastActive ?? undefined,
+    }
   }
 
   return (

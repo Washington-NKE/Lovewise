@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import EmojiPicker from 'emoji-picker-react'
+/* eslint-disable @next/next/no-img-element */
+import { useState, useEffect, useRef, useCallback } from "react"
+import EmojiPicker, { Theme as EmojiTheme, EmojiClickData } from 'emoji-picker-react'
 import { GiphyFetch } from '@giphy/js-fetch-api'
 import { Grid } from '@giphy/react-components'
 import { Button } from "@/components/ui/button"
@@ -15,7 +16,7 @@ import {Textarea} from "@/components/ui/textarea"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Send, Clock, Heart, Check, CheckCheck, AlertCircle, Calendar as CalendarIcon, MapPin, Users } from 'lucide-react'
+import { Send, Clock, Heart, Check, CheckCheck, AlertCircle, Calendar as CalendarIcon } from 'lucide-react'
 import { useTheme } from "next-themes"
 import { format } from "date-fns"
 
@@ -56,6 +57,12 @@ interface DateProposal {
   status: 'pending' | 'accepted' | 'declined'
   createdBy: string
   createdAt: string
+}
+
+interface PartnerPresence {
+  userId: string
+  isOnline: boolean
+  lastSeen: string
 }
 
 const gf = new GiphyFetch(process.env.NEXT_PUBLIC_GIPHY_API_KEY || 'your-default-key')
@@ -99,6 +106,22 @@ export default function MessagesPage() {
     setMounted(true)
   }, [])
 
+  // Load messages from database
+  const loadMessages = useCallback(async (relationshipId?: string) => {
+    try {
+      const relId = relationshipId || relationship?.id
+      if (!relId) return
+
+      const response = await fetch(`/api/messages?relationshipId=${relId}`)
+      if (!response.ok) throw new Error('Failed to load messages')
+      const messagesData = await response.json()
+      setMessages(messagesData)
+    } catch (error) {
+      console.error('Error loading messages:', error)
+      setError('Failed to load messages')
+    }
+  }, [relationship?.id])
+
   // Initialize user and relationship
   useEffect(() => {
     const initializeUser = async () => {
@@ -132,65 +155,111 @@ export default function MessagesPage() {
     }
 
     initializeUser()
-  }, [])
+  }, [loadMessages])
 
-  // Load messages from database
-  const loadMessages = async (relationshipId?: string) => {
+  // Mark message as read
+  const markMessageAsRead = useCallback(async (messageId: string, senderId: string) => {
     try {
-      const relId = relationshipId || relationship?.id
-      if (!relId) return
+      const response = await fetch(`/api/messages/${messageId}/read`, {
+        method: 'PATCH',
+      })
 
-      const response = await fetch(`/api/messages?relationshipId=${relId}`)
-      if (!response.ok) throw new Error('Failed to load messages')
-      const messagesData = await response.json()
-      setMessages(messagesData)
+      if (!response.ok) throw new Error('Failed to mark message as read')
+      setMessages(prev => prev.map(msg =>
+        msg.id === messageId ? { ...msg, isRead: true } : msg
+      ))
+
+      if (ws && isConnected) {
+        ws.send(JSON.stringify({
+          type: 'message_read',
+          messageId,
+          senderId
+        }))
+      }
     } catch (error) {
-      console.error('Error loading messages:', error)
-      setError('Failed to load messages')
+      console.error('Error marking message as read:', error)
     }
-  }
+  }, [isConnected, ws])
 
-  // WebSocket connection
+  // Handle WebSocket messages
+  const handleWebSocketMessage = useCallback((data: {
+    type: string;
+    message?: Message;
+    messageId?: string;
+    userId?: string;
+    partners?: PartnerPresence[];
+    isOnline?: boolean;
+  }) => {
+    switch (data.type) {
+      case 'new_message':
+        if (data.message) {
+          setMessages(prev => [...prev, data.message!])
+          if (data.message.senderId !== currentUser?.id) {
+            markMessageAsRead(data.message.id, data.message.senderId)
+          }
+        }
+        break
+      case 'message_read':
+        if (data.messageId) {
+          setMessages(prev => prev.map(msg =>
+            msg.id === data.messageId ? { ...msg, isRead: true } : msg
+          ))
+        }
+        break
+      case 'presence_change':
+        if (data.userId === partner?.id) {
+          setPartner(prev => prev ? { ...prev, isOnline: data.isOnline } : null)
+        }
+        break
+      case 'presence_update':
+        if (data.partners) {
+          const partnerPresence = data.partners.find((p: PartnerPresence) => p.userId === partner?.id)
+          if (partnerPresence) {
+            setPartner(prev => prev ? {
+              ...prev,
+              isOnline: partnerPresence.isOnline,
+              lastActive: partnerPresence.lastSeen
+            } : null)
+          }
+        }
+        break
+      case 'pong':
+    }
+  }, [currentUser?.id, markMessageAsRead, partner?.id])
+
+  // Manage WebSocket lifecycle
   useEffect(() => {
-    if (!currentUser?.id) return
+    if (!currentUser) return
+
+    let websocket: WebSocket | null = null
 
     const connectWebSocket = () => {
-      const wsUrl = `ws://localhost:3001?userId=${currentUser.id}`
-      const websocket = new WebSocket(wsUrl)
+      const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001'
+      websocket = new WebSocket(wsUrl)
 
       websocket.onopen = () => {
-        console.log('WebSocket connected')
         setIsConnected(true)
-        setError(null)
-        // Send presence update
-        websocket.send(JSON.stringify({ type: 'presence_update' }))
+        setWs(websocket)
+        websocket?.send(JSON.stringify({ type: 'join', userId: currentUser.id }))
       }
 
       websocket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
           handleWebSocketMessage(data)
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error)
+        } catch (err) {
+          console.error('Error parsing websocket message', err)
         }
       }
 
       websocket.onclose = () => {
-        console.log('WebSocket disconnected')
         setIsConnected(false)
-        // Attempt to reconnect after 3 seconds
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current)
-        }
         reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000)
       }
 
-      websocket.onerror = (error) => {
-        console.error('WebSocket error:', error)
-        setError('Connection error. Reconnecting...')
+      websocket.onerror = () => {
+        websocket?.close()
       }
-
-      setWs(websocket)
     }
 
     connectWebSocket()
@@ -199,60 +268,18 @@ export default function MessagesPage() {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
       }
-      if (ws) {
-        ws.close()
-      }
+      websocket?.close()
     }
-  }, [currentUser?.id])
-
-  // Handle WebSocket messages
-  const handleWebSocketMessage = (data: any) => {
-    switch (data.type) {
-      case 'new_message':
-        setMessages(prev => [...prev, data.message])
-        // Mark as read if it's from partner
-        if (data.message.senderId !== currentUser?.id) {
-          markMessageAsRead(data.message.id)
-        }
-        break
-      
-      case 'message_read':
-        setMessages(prev => prev.map(msg => 
-          msg.id === data.messageId ? { ...msg, isRead: true } : msg
-        ))
-        break
-      
-      case 'presence_change':
-        if (data.userId === partner?.id) {
-          setPartner(prev => prev ? { ...prev, isOnline: data.isOnline } : null)
-        }
-        break
-      
-      case 'presence_update':
-        const partnerPresence = data.partners.find((p: any) => p.userId === partner?.id)
-        if (partnerPresence) {
-          setPartner(prev => prev ? { 
-            ...prev, 
-            isOnline: partnerPresence.isOnline,
-            lastActive: partnerPresence.lastSeen
-          } : null)
-        }
-        break
-      
-      case 'pong':
-        // Handle ping response
-        break
-    }
-  }
+  }, [currentUser, handleWebSocketMessage])
 
     // Add emoji to message
-  const onEmojiClick = (emojiData: any) => {
+  const onEmojiClick = (emojiData: EmojiClickData) => {
     setNewMessage(prev => prev + emojiData.emoji)
     setShowEmojiPicker(false)
   }
 
   // Add GIF to message
-  const onGifClick = (gif: any, e: React.SyntheticEvent) => {
+  const onGifClick = (gif: { images: { fixed_height: { url: string } } }, e: React.SyntheticEvent) => {
     e.preventDefault()
     const gifUrl = gif.images.fixed_height.url
     setNewMessage(prev => prev + ` [GIF:${gifUrl}] `)
@@ -310,32 +337,6 @@ export default function MessagesPage() {
     }
   }
 
-  // Mark message as read
-  const markMessageAsRead = async (messageId: string) => {
-    try {
-      const response = await fetch(`/api/messages/${messageId}/read`, {
-        method: 'PATCH',
-      })
-
-      if (!response.ok) throw new Error('Failed to mark message as read')
-      
-      // Update local state
-      setMessages(prev => prev.map(msg => 
-        msg.id === messageId ? { ...msg, isRead: true } : msg
-      ))
-
-      // Notify sender via WebSocket
-      if (ws && isConnected) {
-        ws.send(JSON.stringify({
-          type: 'message_read',
-          messageId,
-          senderId: messages.find(m => m.id === messageId)?.senderId
-        }))
-      }
-    } catch (error) {
-      console.error('Error marking message as read:', error)
-    }
-  }
 
   // Handle date scheduling
   const handleScheduleDate = async () => {
@@ -716,7 +717,7 @@ export default function MessagesPage() {
                         width={300}
                         height={350}
                         previewConfig={{ showPreview: false }}
-                        theme={isDark ? 'dark' : 'light'}
+                        theme={isDark ? EmojiTheme.DARK : EmojiTheme.LIGHT}
                       />
                     </div>
                   )}
