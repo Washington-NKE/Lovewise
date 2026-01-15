@@ -4,7 +4,8 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "../lib/prisma";
 import { revalidatePath } from "next/cache";
-import { Calendar, CalendarIcon, Camera, ChevronRight, Clock, Coffee, Film, Gift, Heart, MapPin, Music, Plane, Plus, Star, Users } from "lucide-react";
+import { JsonValue } from "@prisma/client/runtime/library";
+import type { Gift } from "@prisma/client";
 
 export interface JournalEntry {
   id: string;
@@ -293,9 +294,9 @@ export interface Memory {
   title: string;
   description: string;
   date: string;
-  location?: string;
-  mediaUrls?: string[];
-  album?: string;
+  location?: string | null;
+  mediaUrls?: JsonValue;
+  album?: string | null;
   isFavorite: boolean;
   isSaved: boolean;
   createdAt: string;
@@ -304,6 +305,23 @@ export interface Memory {
   relationshipId: string;
   gradient?: string; // This will be added dynamically
 }
+
+// Type for the raw Prisma memory response (before date string conversion)
+export type PrismaMemory = {
+  id: string;
+  title: string;
+  description: string;
+  date: Date;
+  location: string | null;
+  mediaUrls: JsonValue;
+  album: string | null;
+  isFavorite: boolean;
+  isSaved: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  creatorId: string;
+  relationshipId: string;
+};
 
 export interface NewMemoryData {
   title: string;
@@ -341,13 +359,13 @@ export const getRandomGradient = async (): Promise<string> => {
 };
 
 // Function to attach gradient to memory objects
-const attachGradientToMemory = async (memory: Memory): Promise<Memory> => {
- const gradient = await getRandomGradient();
+const attachGradientToMemory = async (memory: PrismaMemory): Promise<Memory> => {
+  const gradient = await getRandomGradient();
   return {
     ...memory,
-    date: memory.date.toString(),
-    createdAt: memory.createdAt.toString(),
-    updatedAt: memory.updatedAt.toString(),
+    date: memory.date.toISOString(),
+    createdAt: memory.createdAt.toISOString(),
+    updatedAt: memory.updatedAt.toISOString(),
     gradient: gradient
   };
 };
@@ -404,7 +422,7 @@ export const getMemoriesByAlbum = async (relationshipId: string, album: string):
       }
     });
 
-    return memories.map(attachGradientToMemory);
+    return await Promise.all(memories.map(attachGradientToMemory));
   } catch (error) {
     console.error('Error fetching memories by album:', error);
     throw new Error('Failed to fetch memories by album');
@@ -691,6 +709,15 @@ export async function getCurrentUserRelationshipDetails():    Promise<{
         }
       });
 
+      // Normalize profileImage from null to undefined to match return type
+      if (relationship) {
+        return {
+          ...relationship,
+          user: relationship.user ? { ...relationship.user, profileImage: relationship.user.profileImage ?? undefined } : undefined,
+          partner: relationship.partner ? { ...relationship.partner, profileImage: relationship.partner.profileImage ?? undefined } : undefined
+        };
+      }
+
       return relationship;
     } catch (error) {
       console.error("❌ Error fetching relationship details:", error);
@@ -887,11 +914,13 @@ export const getUpcomingEventsByRelationship = async (relationshipId: string): P
     console.log("✅ DB: Final events with gradients:", eventsWithGradients)
     return eventsWithGradients
 
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : ''
     console.error('❌ DB: Error fetching events:', error)
-    console.error('❌ DB: Error message:', error.message)
-    console.error('❌ DB: Error stack:', error.stack)
-    throw new Error('Failed to fetch events: ' + error.message)
+    console.error('❌ DB: Error message:', errorMessage)
+    console.error('❌ DB: Error stack:', errorStack)
+    throw new Error('Failed to fetch events: ' + errorMessage)
   }
 }
 
@@ -954,11 +983,13 @@ export const getPastEventsByRelationship = async (relationshipId: string): Promi
     console.log("✅ DB: Final events with gradients:", eventsWithGradients)
     return eventsWithGradients
 
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : ''
     console.error('❌ DB: Error fetching events:', error)
-    console.error('❌ DB: Error message:', error.message)
-    console.error('❌ DB: Error stack:', error.stack)
-    throw new Error('Failed to fetch events: ' + error.message)
+    console.error('❌ DB: Error message:', errorMessage)
+    console.error('❌ DB: Error stack:', errorStack)
+    throw new Error('Failed to fetch events: ' + errorMessage)
   }
 }
 
@@ -981,7 +1012,23 @@ export const createEvent = async (data: NewEventData): Promise<Event> => {
       }
     });
 
-    return attachGradientToEvent(event);
+    const mappedEvent: Event = {
+      id: event.id,
+      title: event.title,
+      description: event.description ?? "",
+      location: event.location ?? undefined,
+      date: event.startDate.toISOString(),
+      time: event.time ?? undefined,
+      isAllDay: event.isAllDay,
+      type: event.type ?? "other",
+      createdAt: event.createdAt.toISOString(),
+      updatedAt: event.updatedAt.toISOString(),
+      reminderTime: event.reminderTime ? event.reminderTime.toISOString() : undefined,
+      creatorId: event.creatorId,
+      relationshipId: event.relationshipId,
+      gradient: undefined
+    };
+    return attachGradientToEvent(mappedEvent);
   } catch (error) {
     console.error('Error creating event:', error);
     throw new Error('Failed to create event');
@@ -996,13 +1043,13 @@ export const updateMultipleMemories = async (updates: { id: string; changes: Par
 
 // Optional: Get memories by creator (useful for showing "my memories" vs "partner's memories")
 export const getMemoriesByCreator = async (creatorId: string, relationshipId: string): Promise<Memory[]> => {
-  const memories = await prisma.memories.findMany({
+  const memories = await prisma.memory.findMany({
     where: {
       creatorId,
       relationshipId
     },
     orderBy: {
-      createdAt: ('desc')
+      createdAt: 'desc'
     }
   })
 
@@ -1010,113 +1057,52 @@ export const getMemoriesByCreator = async (creatorId: string, relationshipId: st
     throw new Error(`Failed to fetch memories by creator`);
   }
 
-  return memories.map(memory => ({
-    id: memory.id,
-    title: memory.title,
-    description: memory.description,
-    album: memory.album,
-    mediaUrls: memory.media_urls || [],
-    isFavorite: memory.is_favorite,
-    isSaved: memory.is_saved,
-    date: memory.created_at,
-    location: memory.location,
-    gradient: getRandomGradient(),
-    creatorId: memory.creator_id,
-    relationshipId: memory.relationship_id
+  return Promise.all(memories.map(async (memory) => {
+    const prismaMemory = memory as PrismaMemory
+    return {
+      id: prismaMemory.id,
+      title: prismaMemory.title,
+      description: prismaMemory.description,
+      album: prismaMemory.album ?? undefined,
+      mediaUrls: (prismaMemory.mediaUrls as string[] | null) || [],
+      isFavorite: prismaMemory.isFavorite,
+      isSaved: prismaMemory.isSaved,
+      date: prismaMemory.date.toISOString(),
+      location: prismaMemory.location ?? undefined,
+      createdAt: prismaMemory.createdAt.toISOString(),
+      updatedAt: prismaMemory.updatedAt.toISOString(),
+      gradient: await getRandomGradient(),
+      creatorId: prismaMemory.creatorId,
+      relationshipId: prismaMemory.relationshipId
+    };
   }));
 };
 
 //Gift-related database functions
 
-export interface Gift {
-  id: number;
-  giftName: string;
-  date: string;
-  occasion: string;
-  giver: 'user' | 'partner';
-  recipient: 'user' | 'partner';
-  description: string;
-  reaction: string;
-  image?: string;
-  favorite: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface WishlistItem {
-  id: number;
-  item: string;
-  priority: 'Must-Have' | 'Would Love' | 'Nice to Have';
-  surprise: number; // 0-100
-  person: 'user' | 'partner';
-  notes: string;
-  completed: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Occasion {
-  id: number;
-  title: string;
-  date: string;
-  suggestions: string[];
-  budget: number;
-  reminderSet: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface ThoughtfulIdea {
-  id: number;
-  title: string;
-  description: string;
-  type: 'DIY' | 'Experience' | 'Intimate' | 'Personalized';
-  progress: number; // 0-100
-  targetDate?: string;
-  completed: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface SecretPlan {
-  id: number;
-  title: string;
-  description: string;
-  progress: number;
-  items: Array<{
-    name: string;
-    completed: boolean;
-    notes?: string;
-  }>;
-  targetDate?: string;
-  budget?: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface LoveNote {
-  id: number;
-  content: string;
-  isPrivate: boolean;
-  delivered: boolean;
-  deliveryDate?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Gift Functions
-export async function createGift(data: {
+export async function createGift(giftData: {
   giftName: string
-  date: Date
-  occasion: string
+  date?: Date
+  occasion?: string
   description?: string
   reaction?: string
   image?: string
   giverId: string
   recipientId: string
-}) {
+  relationshipId: string
+}): Promise<Gift> {
   return await prisma.gift.create({
-    data,
+    data: {
+      name: giftData.giftName,
+      dateGiven: giftData.date,
+      occasion: giftData.occasion,
+      description: giftData.description,
+      reaction: giftData.reaction,
+      imageUrl: giftData.image,
+      giverId: giftData.giverId,
+      recipientId: giftData.recipientId,
+      relationshipId: giftData.relationshipId
+    },
     include: {
       giver: { select: { id: true, name: true, email: true } },
       recipient: { select: { id: true, name: true, email: true } }
@@ -1136,7 +1122,7 @@ export async function getGiftHistory(userId: string) {
       giver: { select: { id: true, name: true, email: true } },
       recipient: { select: { id: true, name: true, email: true } }
     },
-    orderBy: { date: 'desc' }
+    orderBy: { dateGiven: 'desc' }
   })
 }
 
@@ -1147,11 +1133,20 @@ export async function updateGift(id: string, data: Partial<{
   description: string
   reaction: string
   image: string
-  favorite: boolean
+  isFavorite: boolean
 }>) {
+  const updateData: Record<string, unknown> = {}
+  if (data.giftName) updateData.name = data.giftName
+  if (data.date) updateData.dateGiven = data.date
+  if (data.occasion) updateData.occasion = data.occasion
+  if (data.description) updateData.description = data.description
+  if (data.reaction) updateData.reaction = data.reaction
+  if (data.image) updateData.imageUrl = data.image
+  if (data.isFavorite !== undefined) updateData.isFavorite = data.isFavorite
+  
   return await prisma.gift.update({
     where: { id },
-    data,
+    data: updateData,
     include: {
       giver: { select: { id: true, name: true, email: true } },
       recipient: { select: { id: true, name: true, email: true } }
@@ -1169,7 +1164,7 @@ export async function getFavoriteGifts(userId: string) {
   return await prisma.gift.findMany({
     where: {
       AND: [
-        { favorite: true },
+        { isFavorite: true },
         {
           OR: [
             { giverId: userId },
@@ -1182,7 +1177,7 @@ export async function getFavoriteGifts(userId: string) {
       giver: { select: { id: true, name: true, email: true } },
       recipient: { select: { id: true, name: true, email: true } }
     },
-    orderBy: { date: 'desc' }
+    orderBy: { dateGiven: 'desc' }
   })
 }
 
@@ -1190,23 +1185,30 @@ export async function getFavoriteGifts(userId: string) {
 export async function createWishlistItem(data: {
   item: string
   priority: 'MUST_HAVE' | 'WOULD_LOVE' | 'NICE_TO_HAVE'
-  surprise: number
+  surprise?: number
   notes?: string
   userId: string
+  relationshipId: string
 }) {
   return await prisma.wishlistItem.create({
-    data,
+    data: {
+      name: data.item,
+      priority: data.priority,
+      description: data.notes,
+      userId: data.userId,
+      relationshipId: data.relationshipId
+    },
     include: {
       user: { select: { id: true, name: true, email: true } }
     }
   })
 }
 
-export async function getWishlist(userId: string) {
+export async function getWishlist(userId: string, relationshipId: string) {
   return await prisma.wishlistItem.findMany({
     where: { 
       userId,
-      gifted: false
+      relationshipId
     },
     include: {
       user: { select: { id: true, name: true, email: true } }
@@ -1218,13 +1220,19 @@ export async function getWishlist(userId: string) {
 export async function updateWishlistItem(id: string, data: Partial<{
   item: string
   priority: 'MUST_HAVE' | 'WOULD_LOVE' | 'NICE_TO_HAVE'
-  surprise: number
-  notes: string
-  gifted: boolean
+  surprise?: number
+  notes?: string
+  isSecret?: boolean
 }>) {
+  const updateData: Record<string, unknown> = {}
+  if (data.item) updateData.name = data.item
+  if (data.priority) updateData.priority = data.priority
+  if (data.notes) updateData.description = data.notes
+  if (data.isSecret !== undefined) updateData.isSecret = data.isSecret
+  
   return await prisma.wishlistItem.update({
     where: { id },
-    data,
+    data: updateData,
     include: {
       user: { select: { id: true, name: true, email: true } }
     }
@@ -1240,7 +1248,7 @@ export async function deleteWishlistItem(id: string) {
 export async function markAsGifted(id: string) {
   return await prisma.wishlistItem.update({
     where: { id },
-    data: { gifted: true }
+    data: { isSecret: true }
   })
 }
 
@@ -1252,11 +1260,16 @@ export async function createSpecialOccasion(data: {
   suggestions: string[]
   reminder?: boolean
   userId: string
+  relationshipId: string
 }) {
   return await prisma.specialOccasion.create({
     data: {
-      ...data,
-      budget: data.budget ? data.budget : undefined
+      title: data.title,
+      date: data.date,
+      budget: data.budget,
+      giftIdeas: data.suggestions,
+      userId: data.userId,
+      relationshipId: data.relationshipId
     },
     include: {
       user: { select: { id: true, name: true, email: true } }
@@ -1417,8 +1430,12 @@ export async function createSecretPlanItem(data: {
 }) {
   return await prisma.secretPlanItem.create({
     data: {
-      ...data,
-      cost: data.cost ? data.cost : undefined
+      item: data.item,
+      completed: data.completed,
+      cost: data.cost,
+      notes: data.notes,
+      secretPlanId: data.planId,
+      planId: data.planId
     }
   })
 }
@@ -1429,12 +1446,15 @@ export async function updateSecretPlanItem(id: string, data: Partial<{
   cost: number
   notes: string
 }>) {
+  const updateData: Record<string, unknown> = {}
+  if (data.item) updateData.item = data.item
+  if (data.completed !== undefined) updateData.completed = data.completed
+  if (data.cost !== undefined) updateData.cost = data.cost
+  if (data.notes) updateData.notes = data.notes
+  
   return await prisma.secretPlanItem.update({
     where: { id },
-    data: {
-      ...data,
-      cost: data.cost ? data.cost : undefined
-    }
+    data: updateData
   })
 }
 
@@ -1496,7 +1516,11 @@ export async function createUser(data: {
   name?: string
 }) {
   return await prisma.user.create({
-    data
+    data: {
+      email: data.email,
+      name: data.name ?? "",
+      password: ""
+    }
   })
 }
 
@@ -1504,10 +1528,10 @@ export async function getUser(id: string) {
   return await prisma.user.findUnique({
     where: { id },
     include: {
-      givenGifts: true,
-      receivedGifts: true,
+      giftsGiven: true,
+      giftsReceived: true,
       wishlistItems: true,
-      occasions: true,
+      specialOccasions: true,
       thoughtfulIdeas: true,
       secretPlans: { include: { items: true } },
       loveLetters: true
@@ -1556,7 +1580,7 @@ export async function getGiftStats(userId: string) {
     }),
     prisma.gift.count({
       where: {
-        favorite: true,
+        isFavorite: true,
         OR: [
           { giverId: userId },
           { recipientId: userId }

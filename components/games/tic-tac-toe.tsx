@@ -49,29 +49,36 @@ useEffect(() => {
   };
 
   client.onGameState = (state) => {
-  if (state) {
-    setBoard(state.board);
-    setCurrentPlayer(state.currentPlayer);
-    setWinner(state.winner);
-    setOpponentJoined(true); // If there's state, the opponent must be/have been there
-  }
-};
+    if (state && typeof state === 'object' && 'board' in state && 'currentPlayer' in state) {
+      const gameState = state as Record<string, unknown>;
+      setBoard(gameState.board as Cell[]);
+      setCurrentPlayer(gameState.currentPlayer as Player);
+      setWinner((gameState.winner as Player | 'draw' | null) || null);
+      setOpponentJoined(true); // If there's state, the opponent must be/have been there
+    }
+  };
 
   client.onGameMove = (moveData) => {
     console.log('🎮 TicTacToe: Game move received:', moveData);
-    setBoard(moveData.board);
-    setCurrentPlayer(moveData.currentPlayer);
-    if (moveData.winner) {
-      setWinner(moveData.winner);
+    if (moveData && typeof moveData === 'object' && 'board' in moveData && 'currentPlayer' in moveData) {
+      const move = moveData as Record<string, unknown>;
+      setBoard(move.board as Cell[]);
+      setCurrentPlayer(move.currentPlayer as Player);
+      if (move.winner) {
+        setWinner(move.winner as Player | 'draw');
+      }
     }
   };
 
   client.onChatMessage = (data) => {
     console.log('💬 TicTacToe: Chat message received:', data);
-    setChatMessages(prev => [...prev, { 
-      sender: data.senderId === userId ? userName : partnerName, 
-      message: data.message 
-    }]);
+    if (data && typeof data === 'object' && 'senderId' in data && 'message' in data) {
+      const chatData = data as { senderId: string, message: string };
+      setChatMessages(prev => [...prev, { 
+        sender: chatData.senderId === userId ? userName : partnerName, 
+        message: chatData.message 
+      }]);
+    }
   };
 
   client.connect();

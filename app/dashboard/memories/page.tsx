@@ -74,6 +74,14 @@ const uploadToCloudinary = async (file: File): Promise<string> => {
   return data.secure_url;
 };
 
+// Helper function to get mediaUrls as string array with proper typing
+const getMediaUrls = (mediaUrls: any): string[] => {
+  if (Array.isArray(mediaUrls)) {
+    return mediaUrls.filter((item): item is string => typeof item === 'string');
+  }
+  return [];
+};
+
 export default function MemoriesPage() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [albums, setAlbums] = useState<string[]>([]);
@@ -702,7 +710,7 @@ export default function MemoriesPage() {
 
                 {/* Media Gallery */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {viewingMemory.mediaUrls?.map((url, index) => (
+                  {getMediaUrls(viewingMemory.mediaUrls).map((url: string, index: number) => (
                     <div key={index} className="rounded-lg overflow-hidden">
                       {url.includes('.mp4') || url.includes('.mov') ? (
                         <video 
@@ -795,7 +803,7 @@ export default function MemoriesPage() {
 
                 {/* Media Gallery */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {viewingMemory.mediaUrls?.map((url, index) => (
+                  {getMediaUrls(viewingMemory.mediaUrls).map((url: string, index: number) => (
                     <div key={index} className="rounded-lg overflow-hidden">
                       {url.includes('.mp4') || url.includes('.mov') ? (
                         <video 
@@ -888,7 +896,7 @@ export default function MemoriesPage() {
 
                 {/* Media Gallery */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {viewingMemory.mediaUrls?.map((url, index) => (
+                  {getMediaUrls(viewingMemory.mediaUrls).map((url: string, index: number) => (
                     <div key={index} className="rounded-lg overflow-hidden">
                       {url.includes('.mp4') || url.includes('.mov') ? (
                         <video 
@@ -982,7 +990,7 @@ export default function MemoriesPage() {
 
                 {/* Media Gallery */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {viewingMemory.mediaUrls?.map((url, index) => (
+                  {getMediaUrls(viewingMemory.mediaUrls).map((url: string, index: number) => (
                     <div key={index} className="rounded-lg overflow-hidden">
                       {url.includes('.mp4') || url.includes('.mov') ? (
                         <video 
@@ -1077,7 +1085,7 @@ function MemoryCard({
     });
   };
 
-  const primaryImage = memory.mediaUrls?.[0] || "/placeholder.svg";
+  const primaryImage = ((memory.mediaUrls || []) as string[])[0] || "/placeholder.svg";
   const gradient = memory.gradient || "from-pink-400 to-purple-500";
   
   return (
@@ -1224,10 +1232,10 @@ function MemoryCard({
                   <span className="text-xs font-medium">Favorite</span>
                 </div>
               )}
-              {memory.mediaUrls && memory.mediaUrls.length > 1 && (
+              {((memory.mediaUrls || []) as string[]).length > 1 && (
                 <div className="flex items-center gap-1 text-pink-500">
                   <Image className="h-4 w-4" />
-                  <span className="text-xs font-medium">+{memory.mediaUrls.length - 1}</span>
+                  <span className="text-xs font-medium">+{((memory.mediaUrls || []) as string[]).length - 1}</span>
                 </div>
               )}
             </div>

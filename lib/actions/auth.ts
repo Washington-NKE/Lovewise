@@ -99,7 +99,7 @@ export async function createGift(formData: {
   description?: string;
   dateGiven: Date;
   occasion?: string;
-  type: string;
+  type: "PHYSICAL" | "EXPERIENCE" | "DIGITAL" | "FINANCIAL" | "DIY";
   price?: number;
   isSurprise: boolean;
   recipientId: string;
@@ -124,7 +124,7 @@ export async function updateGift(
     description: string;
     dateGiven: Date;
     occasion: string;
-    type: string;
+    type: "PHYSICAL" | "EXPERIENCE" | "DIGITAL" | "FINANCIAL" | "DIY";
     price: number;
     isFavorite: boolean;
     reaction: string;
@@ -166,7 +166,7 @@ export async function getGiftsForRelationship(relationshipId: string) {
 export async function createWishlistItem(formData: {
   name: string;
   description?: string;
-  priority: string;
+  priority: "MUST_HAVE" | "WOULD_LOVE" | "NICE_TO_HAVE";
   priceEstimate?: number;
   url?: string;
   relationshipId: string;

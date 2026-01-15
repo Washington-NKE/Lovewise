@@ -1,4 +1,4 @@
-import { Calendar, CalendarIcon, Clock, Plus, Heart, Star, Gift, Film, ChevronRight, LucideIcon } from 'lucide-react'
+import { Heart, Star, LucideIcon, Gift, Film } from 'lucide-react'
 
 export interface Event {
   id: number;

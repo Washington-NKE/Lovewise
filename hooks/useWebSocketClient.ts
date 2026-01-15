@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 
 interface WebSocketMessage {
   type: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface PresenceData {
@@ -74,9 +74,12 @@ export const useWebSocketClient = (options: WebSocketClientOptions) => {
           switch (message.type) {
             case 'presence_update':
               if (message.partners && Array.isArray(message.partners)) {
-                const partners = message.partners.map((partner: any) => ({
-                  ...partner,
-                  lastSeen: partner.lastSeen ? new Date(partner.lastSeen) : undefined
+                const partners = message.partners.map((partner: Record<string, unknown>): PresenceData => ({
+                  userId: (partner.userId as string) || '',
+                  name: (partner.name as string) || '',
+                  profileImage: (partner.profileImage as string) || undefined,
+                  isOnline: (partner.isOnline as boolean) || false,
+                  lastSeen: partner.lastSeen ? new Date(partner.lastSeen as string) : undefined
                 }))
                 handlePresenceUpdate(partners)
               }
@@ -84,7 +87,7 @@ export const useWebSocketClient = (options: WebSocketClientOptions) => {
               
             case 'presence_change':
               if (message.userId && typeof message.isOnline === 'boolean') {
-                handlePresenceChange(message.userId, message.isOnline)
+                handlePresenceChange(message.userId as string, message.isOnline as boolean)
               }
               break
               
@@ -130,7 +133,7 @@ export const useWebSocketClient = (options: WebSocketClientOptions) => {
       setIsConnected(false)
       handleConnectionChange(false)
     }
-  }, [userId, handlePresenceUpdate, handlePresenceChange, handleConnectionChange, reconnectAttempts])
+  }, [userId, handlePresenceUpdate, handlePresenceChange, handleConnectionChange, reconnectAttempts, onConnectionChange])
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -172,7 +175,8 @@ export const useWebSocketClient = (options: WebSocketClientOptions) => {
     return () => {
       disconnect()
     }
-  }, []) // Remove connect and disconnect from deps to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // FIX 5: Separate effect for reconnection logic
   useEffect(() => {

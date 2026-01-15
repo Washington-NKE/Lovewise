@@ -19,13 +19,14 @@ interface MessageData {
   receiverId: string
   isRead: boolean
   createdAt: string
+  tempId?: string
 }
 
 interface GameSession {
   id: string;
   gameId: number;
   players: Set<string>;
-  gameState: any;
+  gameState: unknown;
   createdAt: Date;
 }
 
@@ -97,7 +98,7 @@ class MessagingWebSocketServer {
     })
   }
 
-  private handleMessage(userId: string, message: { type: string; [key: string]: any }) {
+  private handleMessage(userId: string, message: { type: string; [key: string]: string | number | boolean | object | null }) {
     const client = this.clients.get(userId)
     if (!client) return
 
@@ -116,19 +117,19 @@ class MessagingWebSocketServer {
         break
 
       case 'send_message':
-        this.handleSendMessage(userId, message.message)
+        this.handleSendMessage(userId, message.message as MessageData)
         break
 
       case 'message_read':
-        this.handleMessageRead(userId, message.messageId, message.senderId)
+        this.handleMessageRead(userId, message.messageId as string, message.senderId as string)
         break
 
       case 'typing_start':
-        this.handleTypingIndicator(userId, message.receiverId, true)
+        this.handleTypingIndicator(userId, message.receiverId as string, true)
         break
 
       case 'typing_stop':
-        this.handleTypingIndicator(userId, message.receiverId, false)
+        this.handleTypingIndicator(userId, message.receiverId as string, false)
         break
 
       case 'request_unread_count':
@@ -136,19 +137,19 @@ class MessagingWebSocketServer {
         break
 
       case 'game_start':
-        this.handleGameStart(userId, message.gameSessionId)
+        this.handleGameStart(userId, message.gameSessionId as string)
         break
 
       case 'game_move':
-        this.handleGameMove(userId, message.gameSessionId, message.data)
+        this.handleGameMove(userId, message.gameSessionId as string, message.data)
         break
 
       case 'chat_message':
-        this.handleGameChat(userId, message.gameSessionId, message.data)
+        this.handleGameChat(userId, message.gameSessionId as string, message.data)
         break
 
       case 'game_end':
-        this.handleGameEnd(message.gameSessionId, message.data)
+        this.handleGameEnd(message.gameSessionId as string, message.data)
         break
     }
   }
@@ -485,10 +486,13 @@ class MessagingWebSocketServer {
     }
 
     if (session.gameState) {
-      client.ws.send(JSON.stringify({
-        type: 'game_state',
-        data: session.gameState
-      }))
+      const client = this.clients.get(userId);
+      if (client && client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(JSON.stringify({
+          type: 'game_state',
+          data: session.gameState
+        }))
+      }
     }
 
     // Notify ALL OTHER players that this player joined
@@ -502,7 +506,7 @@ class MessagingWebSocketServer {
     console.log(`🎮 Broadcast sent to ${broadcastCount} players`);
   }
 
-  private handleGameMove(userId: string, gameSessionId: string, moveData: any) {
+  private handleGameMove(userId: string, gameSessionId: string, moveData: unknown) {
     const session = this.gameSessions.get(gameSessionId);
     if (!session) return;
 
@@ -517,14 +521,14 @@ class MessagingWebSocketServer {
     }, userId);
   }
 
-  private handleGameChat(userId: string, gameSessionId: string, chatData: any) {
+  private handleGameChat(userId: string, gameSessionId: string, chatData: unknown) {
     this.broadcastToGameSession(gameSessionId, {
       type: 'chat_message',
       data: chatData
     });
   }
 
-  private handleGameEnd(gameSessionId: string, resultData: any) {
+  private handleGameEnd(gameSessionId: string, resultData: unknown) {
     const session = this.gameSessions.get(gameSessionId);
     if (!session) return;
 

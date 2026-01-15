@@ -3,10 +3,10 @@
 'use client'
 
 export interface GameMessage {
-  type: 'game_move' | 'game_start' | 'game_end' | 'game_state' | 'player_joined' | 'player_left' | 'chat_message';
+  type: 'game_move' | 'game_start' | 'game_end' | 'game_state' | 'player_joined' | 'player_left' | 'chat_message' | 'ping' | 'pong';
   gameSessionId: string;
   playerId?: string;
-  data?: any;
+  data?: Record<string, unknown>;
   timestamp?: string;
 }
 
@@ -38,7 +38,7 @@ export class GameClient {
         
         // Send game_start message
         const startMessage = {
-          type: 'game_start',
+          type: 'game_start' as const,
           gameSessionId: this.gameSessionId,
           playerId: this.userId
         };
@@ -76,7 +76,7 @@ export class GameClient {
     
     switch (message.type) {
       case 'ping':
-        this.send({ type: 'pong', gameSessionId: this.gameSessionId });
+        this.send({ type: 'pong' as const, gameSessionId: this.gameSessionId });
         break;
       
       case 'game_move':
@@ -116,7 +116,7 @@ export class GameClient {
 
   private startPinging() {
     this.pingInterval = setInterval(() => {
-      this.send({ type: 'ping', gameSessionId: this.gameSessionId });
+      this.send({ type: 'ping' as const, gameSessionId: this.gameSessionId });
     }, 30000);
   }
 
@@ -157,18 +157,18 @@ export class GameClient {
     }
   }
 
-  makeMove(moveData: any) {
+  makeMove(moveData: unknown) {
     console.log('🎯 Making move:', moveData);
     this.send({
-      type: 'game_move',
-      data: moveData
+      type: 'game_move' as const,
+      data: moveData as Record<string, unknown>
     });
   }
 
   sendChatMessage(message: string) {
     console.log('💬 Sending chat message:', message);
     this.send({
-      type: 'chat_message',
+      type: 'chat_message' as const,
       data: { message, senderId: this.userId }
     });
   }
@@ -183,10 +183,10 @@ export class GameClient {
   }
 
   // Event handlers
-  onGameMove?: (moveData: any) => void;
-  onGameState?: (state: any) => void;
+  onGameMove?: (moveData: unknown) => void;
+  onGameState?: (state: unknown) => void;
   onPlayerJoined?: (playerId: string) => void;
   onPlayerLeft?: (playerId: string) => void;
-  onChatMessage?: (data: any) => void;
-  onGameEnd?: (result: any) => void;
+  onChatMessage?: (data: unknown) => void;
+  onGameEnd?: (result: unknown) => void;
 }
