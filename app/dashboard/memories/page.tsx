@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Heart, Plus, Camera, Star, Bookmark, Clock, Film, Image, Sparkles, Upload, X, Loader2, Edit, Trash2, MoreVertical } from 'lucide-react'
 import { motion, AnimatePresence } from "framer-motion"
+import { toast } from 'sonner'
 
 // Import database functions
 import {
@@ -64,6 +65,11 @@ const uploadToCloudinary = async (file: File): Promise<string> => {
     body: formData
   });
   
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Upload failed' }))
+    throw new Error(err?.error || 'Upload to Cloudinary failed')
+  }
+
   const data = await response.json();
   return data.secure_url;
 };
@@ -110,6 +116,7 @@ export default function MemoriesPage() {
         if (!userRelationshipId) {
           console.log("⚠️ No active relationship found for user");
           setError("No active relationship found. Please create or join a relationship first.");
+          toast.error('No active relationship found');
           return;
         }
         
@@ -134,7 +141,8 @@ export default function MemoriesPage() {
         
       } catch (err) {
         console.error('❌ Error loading user data:', err);
-        setError(`Failed to load data: ${err.message}`);
+        setError(`Failed to load data: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        toast.error('Failed to load memories');
       } finally {
         setLoading(false);
       }
@@ -205,7 +213,7 @@ export default function MemoriesPage() {
     setFormData({
       title: memory.title,
       description: memory.description,
-      album: memory.album,
+      album: memory.album || '',
       isFavorite: memory.isFavorite,
       location: memory.location || ''
     });
@@ -217,7 +225,7 @@ export default function MemoriesPage() {
     e.preventDefault();
     
     if (!formData.title || !formData.description) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in all required fields');
       return;
     }
 
@@ -228,12 +236,17 @@ export default function MemoriesPage() {
       
       // Only upload if there are files
       if (uploadedFiles.length > 0) {
-        const uploadResults = await Promise.all(
+        const uploadResults = await Promise.allSettled(
           uploadedFiles.map(file => uploadToCloudinary(file))
         );
-        
-        // Filter out failed uploads
-        mediaUrls = uploadResults.filter((url): url is string => url != null);
+        const successUrls = uploadResults
+          .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+          .map(r => r.value);
+        const failedCount = uploadResults.filter(r => r.status === 'rejected').length;
+        mediaUrls = successUrls;
+        if (failedCount > 0) {
+          toast.error(`${failedCount} file(s) failed to upload`);
+        }
       }
 
       if (editingMemory) {
@@ -257,12 +270,17 @@ export default function MemoriesPage() {
         setMemories(prev => 
           prev.map(memory => 
             memory.id === editingMemory.id 
-              ? { ...updatedMemory, gradient: memory.gradient }
+              ? { ...updatedMemory, gradient: memory.gradient || updatedMemory.gradient }
               : memory
           )
         );
         setEditingMemory(null);
+        toast.success('Memory updated successfully!');
       } else {
+        if (!currentUserId) {
+          toast.error('Not authenticated');
+          return;
+        }
         const newMemoryData: NewMemoryData = {
           title: formData.title,
           description: formData.description,
@@ -278,6 +296,7 @@ export default function MemoriesPage() {
         
         // Add new memory to state
         setMemories(prev => [newMemory, ...prev]);
+        toast.success('Memory created successfully!');
       }
 
       // Update albums if new album was added
@@ -298,7 +317,7 @@ export default function MemoriesPage() {
       
     } catch (error) {
       console.error('Error saving memory:', error);
-      alert('Error saving memory. Please try again.');
+      toast.error('Failed to save memory');
     } finally {
       setIsUploading(false);
     }
@@ -310,10 +329,11 @@ export default function MemoriesPage() {
       
       // Remove memory from state
       setMemories(prev => prev.filter(memory => memory.id !== memoryId));
+      toast.success('Memory deleted successfully!');
       
     } catch (error) {
       console.error('Error deleting memory:', error);
-      alert('Error deleting memory. Please try again.');
+      toast.error('Failed to delete memory');
     }
   };
 
@@ -324,13 +344,14 @@ export default function MemoriesPage() {
       setMemories(prev => 
         prev.map(memory => 
           memory.id === memoryId 
-            ? { ...updatedMemory, gradient: memory.gradient } // Preserve gradient
+            ? { ...updatedMemory, gradient: memory.gradient || updatedMemory.gradient } // Preserve gradient
             : memory
         )
       );
+      toast.success('Favorite status updated');
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      alert('Error updating favorite status. Please try again.');
+      toast.error('Failed to update favorite status');
     }
   };
 
@@ -349,13 +370,14 @@ export default function MemoriesPage() {
       setMemories(prev => 
         prev.map(memory => 
           memory.id === memoryId 
-            ? { ...updatedMemory, gradient: memory.gradient } // Preserve gradient
+            ? { ...updatedMemory, gradient: memory.gradient || updatedMemory.gradient } // Preserve gradient
             : memory
         )
       );
+      toast.success('Saved status updated');
     } catch (error) {
       console.error('Error toggling saved:', error);
-      alert('Error updating saved status. Please try again.');
+      toast.error('Failed to update saved status');
     }
   };
 

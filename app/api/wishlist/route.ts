@@ -12,9 +12,23 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Find the active relationship for the user
+    const relationship = await prisma.relationship.findFirst({
+      where: {
+        status: 'ACTIVE',
+        OR: [{ userId: session.user.id }, { partnerId: session.user.id }]
+      },
+      select: { id: true }
+    })
+
+    if (!relationship) {
+      return NextResponse.json({ error: 'No active relationship found' }, { status: 400 })
+    }
+
     const wishlistItems = await prisma.wishlistItem.findMany({
       where: {
-        userId: session.user.id
+        userId: session.user.id,
+        relationshipId: relationship.id
       },
       orderBy: [
         { createdAt: 'desc' }
@@ -57,15 +71,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Item is required' }, { status: 400 })
     }
 
+    // Find the active relationship for the user (required by schema)
+    const relationship = await prisma.relationship.findFirst({
+      where: {
+        status: 'ACTIVE',
+        OR: [{ userId: session.user.id }, { partnerId: session.user.id }]
+      },
+      select: { id: true }
+    })
+
+    if (!relationship) {
+      return NextResponse.json({ error: 'No active relationship found' }, { status: 400 })
+    }
+
     const wishlistItem = await prisma.wishlistItem.create({
       data: {
         name,
-        description,
+        description: description ?? undefined,
         isSecret,
-        priceEstimate,
-        url,
-        imageUrl,
-        userId: session.user.id
+        priceEstimate: typeof priceEstimate === 'number' ? priceEstimate : undefined,
+        url: url ?? undefined,
+        imageUrl: imageUrl ?? undefined,
+        userId: session.user.id,
+        relationshipId: relationship.id
       }
     })
 
