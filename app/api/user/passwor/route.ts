@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+
+export const runtime = 'nodejs'
 // app/api/user/password/route.ts
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const session = await auth()
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const currentUser = await prisma.user.findUnique({ where: { email: session.user.email } })
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     const body = await request.json()
@@ -22,9 +29,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get current user with password
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
-    })
+    const user = await prisma.user.findUnique({ where: { id: currentUser.id } })
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -40,10 +45,7 @@ export async function PUT(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(newPassword, 12)
 
     // Update password
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: { password: hashedPassword }
-    })
+    await prisma.user.update({ where: { id: currentUser.id }, data: { password: hashedPassword } })
 
     return NextResponse.json({ message: 'Password updated successfully' })
   } catch (error) {

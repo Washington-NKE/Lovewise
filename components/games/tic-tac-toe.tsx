@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, MessageCircle, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { GameClient } from '@/lib/game-client'
+import {getSession} from ''
 
 interface TicTacToeProps {
   gameSessionId: string;
@@ -27,42 +27,92 @@ export function TicTacToe({ gameSessionId, userId, partnerId, userName, partnerN
   const [opponentJoined, setOpponentJoined] = useState(false);
   const [chatMessages, setChatMessages] = useState<Array<{ sender: string; message: string }>>([]);
 
-  useEffect(() => {
-    const client = new GameClient(userId, gameSessionId);
+useEffect(() => {
+  console.log('🎮 TicTacToe: Initializing game client');
+  console.log('🎮 Props:', { gameSessionId, userId, partnerId, userName, partnerName });
+  
+  const client = new GameClient(userId, gameSessionId);
+  
+  client.onPlayerJoined = (playerId) => {
+    console.log('🎮 TicTacToe: Player joined event received');
+    console.log('🎮 Joined playerId:', playerId);
+    console.log('🎮 Expected partnerId:', partnerId);
+    console.log('🎮 Match?', playerId === partnerId);
+
     
-    client.onPlayerJoined = (playerId) => {
-      console.log('🎮 Player joined:', playerId);
-      if (playerId === partnerId) {
-        setOpponentJoined(true);
-      }
-    };
-
-    client.onGameMove = (moveData) => {
-      setBoard(moveData.board);
-      setCurrentPlayer(moveData.currentPlayer);
-      if (moveData.winner) {
-        setWinner(moveData.winner);
-      }
-    };
-
-    client.onChatMessage = (data) => {
-      setChatMessages(prev => [...prev, { sender: data.senderId === userId ? userName : partnerName, message: data.message }]);
-    };
-
-    client.connect();
-    setGameClient(client);
-
-    return () => {
-      client.disconnect();
-    };
-  }, [gameSessionId, userId, partnerId]);
-
-  useEffect(() => {
-    // If partnerId equals userId, enable solo immediately
-    if (partnerId === userId) {
-      setOpponentJoined(true)
+    if (playerId === partnerId) {
+      console.log('✅ Partner joined! Setting opponentJoined = true');
+      setOpponentJoined(true);
+    } else {
+      console.log('⚠️ Joined player is not the partner');
     }
-  }, [partnerId, userId])
+  };
+
+  client.onGameState = (state) => {
+  if (state) {
+    setBoard(state.board);
+    setCurrentPlayer(state.currentPlayer);
+    setWinner(state.winner);
+    setOpponentJoined(true); // If there's state, the opponent must be/have been there
+  }
+};
+
+  client.onGameMove = (moveData) => {
+    console.log('🎮 TicTacToe: Game move received:', moveData);
+    setBoard(moveData.board);
+    setCurrentPlayer(moveData.currentPlayer);
+    if (moveData.winner) {
+      setWinner(moveData.winner);
+    }
+  };
+
+  client.onChatMessage = (data) => {
+    console.log('💬 TicTacToe: Chat message received:', data);
+    setChatMessages(prev => [...prev, { 
+      sender: data.senderId === userId ? userName : partnerName, 
+      message: data.message 
+    }]);
+  };
+
+  client.connect();
+  setGameClient(client);
+
+  return () => {
+    console.log('🎮 TicTacToe: Cleaning up game client');
+    client.disconnect();
+  };
+}, [gameSessionId, userId, partnerId, userName, partnerName]);
+
+useEffect(() => {
+  console.log('🎮 OpponentJoined state changed:', opponentJoined);
+}, [opponentJoined]);
+
+useEffect(() => {
+  // If partnerId equals userId, enable solo immediately
+  if (partnerId === userId) {
+    console.log('🎮 Solo mode enabled (partnerId === userId)');
+    setOpponentJoined(true);
+  }
+}, [partnerId, userId]);
+
+useEffect(() => {
+  // Assign player symbol deterministically by comparing IDs (works for cuid/uuid strings)
+  if (!partnerId || !userId) return;
+  try {
+    if (userId.localeCompare(partnerId) < 0) {
+      setPlayerSymbol('heart');
+    } else {
+      setPlayerSymbol('promise');
+    }
+  } catch (e) {
+    // Fallback to simple string comparison if localeCompare fails
+    if (userId < partnerId) {
+      setPlayerSymbol('heart');
+    } else {
+      setPlayerSymbol('promise');
+    }
+  }
+}, [userId, partnerId]);
 
   const checkWinner = (squares: Cell[]): Player | 'draw' | null => {
     const lines = [

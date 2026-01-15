@@ -442,9 +442,13 @@ class MessagingWebSocketServer {
   }
 
   private handleGameStart(userId: string, gameSessionId: string) {
+    console.log(`🎮 handleGameStart: User ${userId} joining session ${gameSessionId}`);
+    
     let session = this.gameSessions.get(gameSessionId);
     
     if (!session) {
+      // First player creates the session
+      console.log(`🎮 Creating new session for ${gameSessionId}`);
       session = {
         id: gameSessionId,
         gameId: 0,
@@ -453,16 +457,49 @@ class MessagingWebSocketServer {
         createdAt: new Date()
       };
       this.gameSessions.set(gameSessionId, session);
+      console.log(`🎮 Session created. Player count: ${session.players.size}`);
     } else {
+      // Subsequent players join existing session
+      console.log(`🎮 Session exists. Current players:`, Array.from(session.players));
+      
+      // First, notify the NEW player about ALL existing players
+      const client = this.clients.get(userId);
+      if (client && client.ws.readyState === WebSocket.OPEN) {
+        session.players.forEach(existingPlayerId => {
+          if (existingPlayerId !== userId) {
+            console.log(`🎮 Notifying ${userId} that ${existingPlayerId} is already in the game`);
+            client.ws.send(JSON.stringify({
+              type: 'player_joined',
+              playerId: existingPlayerId,
+              playerCount: session!.players.size + 1 // Future count after this player joins
+            }));
+          }
+        });
+      } else {
+        console.error(`❌ Client ${userId} not found or connection not open`);
+      }
+      
+      // Add new player to session
       session.players.add(userId);
+      console.log(`🎮 Added ${userId} to session. New player count: ${session.players.size}`);
     }
 
-    // Notify all players in the session
-    this.broadcastToGameSession(gameSessionId, {
+    if (session.gameState) {
+      client.ws.send(JSON.stringify({
+        type: 'game_state',
+        data: session.gameState
+      }))
+    }
+
+    // Notify ALL OTHER players that this player joined
+    console.log(`🎮 Broadcasting ${userId} joined to other players`);
+    const broadcastCount = this.broadcastToGameSession(gameSessionId, {
       type: 'player_joined',
       playerId: userId,
       playerCount: session.players.size
-    });
+    }, userId);
+    
+    console.log(`🎮 Broadcast sent to ${broadcastCount} players`);
   }
 
   private handleGameMove(userId: string, gameSessionId: string, moveData: any) {
@@ -502,18 +539,34 @@ class MessagingWebSocketServer {
     }, 60000); // 1 minute
   }
 
-  private broadcastToGameSession(gameSessionId: string, message: object, excludeUserId?: string) {
+  private broadcastToGameSession(gameSessionId: string, message: object, excludeUserId?: string): number {
     const session = this.gameSessions.get(gameSessionId);
-    if (!session) return;
+    if (!session) {
+      console.warn(`⚠️ Session ${gameSessionId} not found for broadcast`);
+      return 0;
+    }
+
+    let sentCount = 0;
+    console.log(`📢 Broadcasting to session ${gameSessionId}, excluding ${excludeUserId || 'none'}`);
+    console.log(`📢 Players in session:`, Array.from(session.players));
 
     session.players.forEach(playerId => {
-      if (playerId === excludeUserId) return;
+      if (playerId === excludeUserId) {
+        console.log(`⏭️ Skipping ${playerId} (excluded)`);
+        return;
+      }
       
       const client = this.clients.get(playerId);
       if (client && client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(JSON.stringify(message));
+        console.log(`✅ Sent message to ${playerId}:`, message);
+        sentCount++;
+      } else {
+        console.warn(`⚠️ Could not send to ${playerId} - client not found or connection not open`);
       }
     });
+    
+    return sentCount;
   }
 }
 

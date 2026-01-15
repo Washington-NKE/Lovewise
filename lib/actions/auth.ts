@@ -276,6 +276,8 @@ export const getPartnerInfo = cache(async (userId: string): Promise<Partner | nu
     // Determine which user is the partner (not the current user)
     const partner = relationship.userId === userId ? relationship.partner : relationship.user
 
+    console.log("Log the Partner", partner)
+
     if (!partner) {
       return null
     }

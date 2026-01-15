@@ -111,6 +111,7 @@ export const LoveJournalSidebar: React.FC<LoveJournalSidebarProps> = ({ session,
   
   const [isHovering, setIsHovering] = useState(false)
   const [loveQuote, setLoveQuote] = useState("")
+
   
   // Love quotes to display randomly
   const loveQuotes = [
