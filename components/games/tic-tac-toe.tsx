@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, MessageCircle, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { GameClient } from '@/lib/game-client'
-import { getSession } from 'next-auth/react'
 
 interface TicTacToeProps {
   gameSessionId: string;
