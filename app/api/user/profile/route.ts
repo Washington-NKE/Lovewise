@@ -18,21 +18,11 @@ export async function GET() {
         name: true,
         email: true,
         bio: true,
-        // profilePicture: true,
         emailNotifications: true,
         pushNotifications: true,
         eventReminders: true,
         partnerActivityNotifications: true,
         privateJournalDefault: true,
-        partnerId: true,
-        partner: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          }
-        }
       }
     })
 
@@ -40,15 +30,34 @@ export async function GET() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Find active relationship and resolve partner details
+    const relationship = await prisma.relationship.findFirst({
+      where: {
+        status: 'ACTIVE',
+        OR: [{ userId: session.user.id }, { partnerId: session.user.id }],
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        partner: { select: { id: true, name: true, email: true } },
+      },
+    })
+
+    const partner = relationship
+      ? relationship.userId === session.user.id
+        ? relationship.partner
+        : relationship.user
+      : null
+
     // Transform to match frontend interface
     const userData = {
       ...user,
+      partner,
       notifications: {
         email: user.emailNotifications,
         push: user.pushNotifications,
         reminders: user.eventReminders,
         partnerActivity: user.partnerActivityNotifications,
-      }
+      },
     }
 
     return NextResponse.json(userData)
@@ -66,7 +75,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { firstName, lastName, email, bio } = body
+    const { name, email, bio } = body
 
     // Validate email uniqueness if changed
     if (email !== session.user.email) {
@@ -78,7 +87,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    const updatedUser = await prisma.user.update({
+    await prisma.user.update({
       where: { id: session.user.id },
       data: {
         name,
