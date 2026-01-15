@@ -1,4 +1,3 @@
-import React from 'react';
 import { Calendar, CalendarIcon, Clock, Plus, Heart, Star, Gift, Film, ChevronRight, LucideIcon } from 'lucide-react'
 
 export interface Event {
@@ -10,6 +9,22 @@ export interface Event {
   type: string;
   reminder: boolean;
   icon?: LucideIcon;
+  gradient?: string;
+}
+
+export interface Memory {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  mediaUrls: string[];
+  album: string;
+  isFavorite: boolean;
+  isSaved: boolean;
+  createdAt: string;
+  updatedAt: string;
+  creatorId: string;
+  relationshipId: string;
   gradient?: string;
 }
 
