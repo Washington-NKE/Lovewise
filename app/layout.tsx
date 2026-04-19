@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Risper & Washington Macharia",
+  title: "Angela & Washington Macharia",
   description: "Couple Journal",
 };
 

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Heart, Calendar, MessageSquare, Camera, Star, ChevronRight } from 'lucide-react'
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { useState, useEffect } from "react"
+import { brandingConfig } from "@/lib/branding-config"
 
 export default function Home() {
   const [isVisible, setIsVisible] = useState(false);
@@ -23,7 +24,7 @@ export default function Home() {
                 <Heart className="h-7 w-7 text-rose-500 group-hover:animate-ping absolute opacity-75" />
                 <Heart className="h-7 w-7 text-rose-500 relative" />
               </div>
-              <span className="font-bold text-xl bg-gradient-to-r from-rose-600 to-red-500 dark:from-rose-400 dark:to-red-300 text-transparent bg-clip-text transition-all duration-300 ease-in-out">Risper & Washington Macharia</span>
+              <span className="font-bold text-xl bg-gradient-to-r from-rose-600 to-red-500 dark:from-rose-400 dark:to-red-300 text-transparent bg-clip-text transition-all duration-300 ease-in-out">{brandingConfig.coupleName}</span>
             </Link>
           </div>
           <div className="flex flex-1 items-center justify-end space-x-4">
