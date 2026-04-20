@@ -11,6 +11,7 @@ export default function GamePage() {
   const [gameSessionId, setGameSessionId] = useState<string | null>(null)
   const [partner, setPartner] = useState<{ id: string; name?: string } | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [initialOpponentJoined, setInitialOpponentJoined] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -20,16 +21,21 @@ export default function GamePage() {
         setLoading(true)
         setError(null)
 
-        const userRes = await fetch('/api/user/current')
-        if (!userRes.ok) throw new Error('Failed to fetch user')
-        const user = await userRes.json()
-        setUserId(user.id)
+        const currentUserId = session?.user?.id
+        if (!currentUserId) {
+          throw new Error('Missing user id in session')
+        }
+        setUserId(currentUserId)
+
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 12000)
 
         const sessionRes = await fetch('/api/games/session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gameSlug: params.id })
-        })
+          body: JSON.stringify({ gameSlug: params.id }),
+          signal: controller.signal,
+        }).finally(() => clearTimeout(timeout))
         if (!sessionRes.ok) {
           const msg = await sessionRes.text()
           throw new Error(msg || 'Failed to create game session')
@@ -39,6 +45,7 @@ export default function GamePage() {
         setGameSessionId(data.sessionId || null)
         // partner can be null for solo play; set it anyway
         setPartner(data.partner || null)
+        setInitialOpponentJoined(Boolean(data.opponentJoined))
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Unknown error')
       } finally {
@@ -70,6 +77,7 @@ export default function GamePage() {
         partnerId={partner?.id || userId} // fallback to self for solo
         userName={session?.user?.name || 'You'}
         partnerName={partner?.name || 'Solo'}
+        initialOpponentJoined={initialOpponentJoined}
       />
     )
   }

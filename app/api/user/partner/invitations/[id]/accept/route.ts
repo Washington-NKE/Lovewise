@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { serverCache } from '@/lib/server-cache'
 
 export const runtime = 'nodejs'
 
@@ -43,6 +44,9 @@ export async function POST(
       where: { id },
       data: { status: 'ACTIVE', anniversaryDate: new Date() }
     })
+
+    serverCache.delete(`invites:${currentUser.id}`)
+    serverCache.delete(`invites:${relationship.userId}`)
 
     return NextResponse.json({ message: 'Invitation accepted' })
   } catch (error) {

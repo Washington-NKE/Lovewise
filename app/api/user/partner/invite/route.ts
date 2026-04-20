@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { serverCache } from '@/lib/server-cache'
 
 export const runtime = 'nodejs'
 
@@ -20,24 +21,55 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { email } = body
+    const rawEmail = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
+    const rawUserId = typeof body?.userId === 'string' ? body.userId.trim() : ''
 
-    if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+    if (!rawEmail && !rawUserId) {
+      return NextResponse.json({ error: 'Email or userId is required' }, { status: 400 })
+    }
+
+    // Resolve invite target by userId (preferred) or email.
+    const targetUser = rawUserId
+      ? await prisma.user.findUnique({ where: { id: rawUserId } })
+      : await prisma.user.findUnique({ where: { email: rawEmail } })
+
+    if (!targetUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Check if user is trying to invite themselves
-    if (email === currentUser.email) {
+    if (targetUser.id === currentUser.id) {
       return NextResponse.json({ error: 'Cannot invite yourself' }, { status: 400 })
     }
 
-    // Check if the email belongs to an existing user
-    const targetUser = await prisma.user.findUnique({
-      where: { email }
+    const inviterActiveRelationship = await prisma.relationship.findFirst({
+      where: {
+        status: 'ACTIVE',
+        OR: [{ userId: currentUser.id }, { partnerId: currentUser.id }]
+      },
+      select: { id: true }
     })
 
-    if (!targetUser) {
-      return NextResponse.json({ error: 'User with this email not found' }, { status: 404 })
+    if (inviterActiveRelationship) {
+      return NextResponse.json(
+        { error: 'You already have an active partner. Disconnect first.' },
+        { status: 400 }
+      )
+    }
+
+    const targetActiveRelationship = await prisma.relationship.findFirst({
+      where: {
+        status: 'ACTIVE',
+        OR: [{ userId: targetUser.id }, { partnerId: targetUser.id }]
+      },
+      select: { id: true }
+    })
+
+    if (targetActiveRelationship) {
+      return NextResponse.json(
+        { error: 'This user already has an active partner.' },
+        { status: 400 }
+      )
     }
 
     // Check if already in a relationship with this user
@@ -75,6 +107,9 @@ export async function POST(request: NextRequest) {
         }
       }
     })
+
+    serverCache.delete(`invites:${currentUser.id}`)
+    serverCache.delete(`invites:${targetUser.id}`)
 
     // TODO: Send email notification to the invited user
 

@@ -4,6 +4,7 @@ import { useState, useEffect, type AnchorHTMLAttributes } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   Sidebar,
   SidebarContent,
@@ -113,6 +114,7 @@ export const LoveJournalSidebar: React.FC<LoveJournalSidebarProps> = ({ session,
   
   const [isHovering, setIsHovering] = useState(false)
   const [loveQuote, setLoveQuote] = useState("")
+  const [unreadInviteCount, setUnreadInviteCount] = useState(0)
 
   
   // Love quotes to display randomly
@@ -155,6 +157,50 @@ export const LoveJournalSidebar: React.FC<LoveJournalSidebarProps> = ({ session,
       clearInterval(interval)
     }
   }, [isHovering])
+
+  useEffect(() => {
+    let active = true
+
+    const fetchUnreadInvites = async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const response = await fetch('/api/user/partner/invitations', { cache: 'no-store' })
+        if (!response.ok) return
+
+        const payload = await response.json()
+        const incoming = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.incoming)
+            ? payload.incoming
+            : []
+
+        if (active) {
+          setUnreadInviteCount(incoming.length)
+        }
+      } catch {
+        if (active) {
+          setUnreadInviteCount(0)
+        }
+      }
+    }
+
+    void fetchUnreadInvites()
+    const timer = setInterval(fetchUnreadInvites, 120000)
+
+    const onFocus = () => {
+      void fetchUnreadInvites()
+    }
+
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+
+    return () => {
+      active = false
+      clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
+  }, [pathname])
 
   //Handle sign out
   const handleSignOut = async () => {
@@ -321,9 +367,21 @@ export const LoveJournalSidebar: React.FC<LoveJournalSidebarProps> = ({ session,
                       </div>
                     </motion.div>
                   ) : (
-                    <Button variant="outline" size="sm" className="text-xs bg-gradient-to-r from-rose-100 to-fuchsia-100 border-rose-200 text-rose-700 hover:bg-gradient-to-r hover:from-rose-200 hover:to-fuchsia-200 transition-all duration-300">
-                      <Heart className="h-3 w-3 mr-1 text-rose-500" />
-                      Invite Love
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-gradient-to-r from-rose-100 to-fuchsia-100 border-rose-200 text-rose-700 hover:bg-gradient-to-r hover:from-rose-200 hover:to-fuchsia-200 transition-all duration-300"
+                    >
+                      <SidebarLink href="/dashboard/settings#relationship-invites" className="inline-flex items-center">
+                        <Heart className="h-3 w-3 mr-1 text-rose-500" />
+                        Invite Love
+                        {unreadInviteCount > 0 ? (
+                          <Badge variant="destructive" className="ml-2 h-5 min-w-5 px-1 text-[10px]">
+                            {unreadInviteCount}
+                          </Badge>
+                        ) : null}
+                      </SidebarLink>
                     </Button>
                   )}
                 </motion.div>
@@ -348,6 +406,21 @@ export const LoveJournalSidebar: React.FC<LoveJournalSidebarProps> = ({ session,
                           <BookHeart className="h-5 w-5 text-rose-600 group-hover:text-rose-700 transition-colors" />
                           <span className="text-rose-800 group-hover:text-rose-900 transition-colors">Dashboard</span>
                         </motion.div>
+                      </motion.div>
+                    </SidebarLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === "/dashboard/settings"} className="hover:bg-rose-100/50 transition-all">
+                    <SidebarLink href="/dashboard/settings#relationship-invites" className="group">
+                      <motion.div whileHover={{ rotate: 5 }} className="flex items-center">
+                        <HeartHandshake className="h-5 w-5 text-rose-600 group-hover:text-rose-700 transition-colors" />
+                        <span className="text-rose-800 group-hover:text-rose-900 transition-colors">Relationship Invites</span>
+                        {unreadInviteCount > 0 ? (
+                          <Badge variant="destructive" className="ml-2 h-5 min-w-5 px-1 text-[10px]">
+                            {unreadInviteCount}
+                          </Badge>
+                        ) : null}
                       </motion.div>
                     </SidebarLink>
                   </SidebarMenuButton>
@@ -439,7 +512,7 @@ export const LoveJournalSidebar: React.FC<LoveJournalSidebarProps> = ({ session,
               </SidebarMenu>
             </SidebarContent>
             
-            <SidebarFooter className="border-t border-rose-200 p-4 bg-gradient-to-b from-rose-50 to-rose-100/50">
+            <SidebarFooter className="border-t border-rose-200 px-3 py-2 bg-gradient-to-b from-rose-50 to-rose-100/50">
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={pathname === "/dashboard/settings"} className="hover:bg-rose-100/70 transition-all">
@@ -463,18 +536,6 @@ export const LoveJournalSidebar: React.FC<LoveJournalSidebarProps> = ({ session,
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
-              
-              {/* Connection Status */}
-              <motion.div 
-                className="mt-4 p-2 rounded-lg bg-gradient-to-r from-pink-100/70 to-rose-100/70 flex items-center justify-center gap-2"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-              >
-                <HeartHandshake className="h-4 w-4 text-rose-600" />
-                <span className="text-xs text-rose-700">
-                  {partner ? `Connected with ${partner.name}` : 'Awaiting Connection'}
-                </span>
-              </motion.div>
             </SidebarFooter>
           </Sidebar>
         </SidebarProvider>

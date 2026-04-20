@@ -35,6 +35,7 @@ export class GameClient {
         console.log('✅ Game WebSocket connected');
         this.reconnectAttempts = 0;
         this.startPinging();
+        this.onConnectionChange?.(true);
         
         // Send game_start message
         const startMessage = {
@@ -59,11 +60,13 @@ export class GameClient {
       this.ws.onclose = (event) => {
         console.log(`🔌 Game WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason}`);
         this.stopPinging();
+        this.onConnectionChange?.(false);
         this.attemptReconnect();
       };
 
       this.ws.onerror = (error) => {
         console.error('❌ Game WebSocket error:', error);
+        this.onConnectionChange?.(false);
       };
     } catch (error) {
       console.error('❌ Error connecting to game WebSocket:', error);
@@ -189,4 +192,5 @@ export class GameClient {
   onPlayerLeft?: (playerId: string) => void;
   onChatMessage?: (data: unknown) => void;
   onGameEnd?: (result: unknown) => void;
+  onConnectionChange?: (connected: boolean) => void;
 }

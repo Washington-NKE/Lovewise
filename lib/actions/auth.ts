@@ -11,9 +11,11 @@ import { cache } from "react";
 export const signInWithCredentials = async (
   params: { email: string; password: string }
 ) => {
+  const normalizedEmail = params.email.trim().toLowerCase();
+
   try {
     const result = await signIn("credentials", {
-      email: params.email,
+      email: normalizedEmail,
       password: params.password,
       redirect: false,
     });
@@ -29,8 +31,22 @@ export const signInWithCredentials = async (
     // Handle specific NextAuth errors
     if (error instanceof AuthError) {
       switch (error.type) {
-        case "CredentialsSignin":
+        case "CredentialsSignin": {
+          const existingUser = await prisma.user.findUnique({
+            where: { email: normalizedEmail },
+            select: { id: true, password: true }
+          });
+
+          if (!existingUser) {
+            return { success: false, error: "No account found for this email. Please sign up first." };
+          }
+
+          if (!existingUser.password) {
+            return { success: false, error: "This account has no password set. Use your social provider to sign in." };
+          }
+
           return { success: false, error: "Invalid credentials" };
+        }
         default:
           return { success: false, error: "Authentication failed" };
       }
@@ -55,8 +71,10 @@ export const signUp = async (params: {
   password: string;
 }) => {
   try {
+    const normalizedEmail = params.email.trim().toLowerCase();
+
     const existingUser = await prisma.user.findUnique({
-      where: { email: params.email }
+      where: { email: normalizedEmail }
     });
 
     if (existingUser) {
@@ -67,8 +85,8 @@ export const signUp = async (params: {
 
     await prisma.user.create({
       data: {
-        name: params.fullName,
-        email: params.email,
+        name: params.fullName.trim(),
+        email: normalizedEmail,
         password: hashedPassword
       }
     });

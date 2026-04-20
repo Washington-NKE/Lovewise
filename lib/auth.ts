@@ -5,6 +5,7 @@ import { compare } from "bcryptjs";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
 
+const nextAuthSecret = process.env.NEXTAUTH_SECRET;
 declare module "next-auth" {
   interface User {
     id?: string;
@@ -22,7 +23,7 @@ declare module "next-auth" {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: nextAuthSecret,
   adapter: PrismaAdapter(prisma),
   
   session: {
@@ -42,10 +43,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
-                        
-        const user = await prisma.user.findUnique({
+
+        const normalizedEmail = credentials.email.toString().trim().toLowerCase();
+        const plainPassword = credentials.password.toString();
+
+        const user = await (prisma as any).user.findUnique({
           where: {
-            email: credentials.email.toString()
+            email: normalizedEmail
           },
           select: {
             id: true,
@@ -53,12 +57,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             name: true,
             password: true
           }
-        });
+        }) as {
+          id: string;
+          email: string;
+          name: string | null;
+          password: string | null;
+        } | null;
                         
-        if (!user) return null;
+        if (!user || !user.password) return null;
                         
         const isPasswordValid = await compare(
-          credentials.password.toString(),
+          plainPassword,
           user.password,
         );
                         

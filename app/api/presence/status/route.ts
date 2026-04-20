@@ -1,10 +1,9 @@
 
 // app/api/presence/status/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
+import { serverCache } from '@/lib/server-cache'
 import {auth} from '@/lib/auth'
-
-const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +18,23 @@ export async function GET(request: NextRequest) {
 
     if (!targetUserId) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+    }
+
+    const cacheKey = `presence:status:${targetUserId}`
+    const cached = serverCache.get<{
+      userId: string
+      name: string | null
+      profileImage: string | null
+      isOnline: boolean
+      lastSeen: Date | null
+    }>(cacheKey)
+
+    if (cached) {
+      return NextResponse.json(cached, {
+        headers: {
+          'Cache-Control': 'private, max-age=0, s-maxage=5, stale-while-revalidate=25'
+        }
+      })
     }
 
     // Get user's presence information
@@ -40,12 +56,20 @@ export async function GET(request: NextRequest) {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
     const isOnline = user.lastActive ? user.lastActive > fiveMinutesAgo : false
 
-    return NextResponse.json({
+    const payload = {
       userId: user.id,
       name: user.name,
       profileImage: user.profileImage,
       isOnline,
       lastSeen: user.lastActive
+    }
+
+    serverCache.set(cacheKey, payload, 5000)
+
+    return NextResponse.json(payload, {
+      headers: {
+        'Cache-Control': 'private, max-age=0, s-maxage=5, stale-while-revalidate=25'
+      }
     })
   } catch (error) {
     console.error('Error fetching presence status:', error)

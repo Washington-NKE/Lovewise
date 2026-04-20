@@ -1,4 +1,3 @@
-import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -8,31 +7,32 @@ const publicRoutes = ["/", "/signin", "/signup", "/forgot-password"];
 // Auth-only routes that should redirect to dashboard if not signed in
 const authRoutes = ["/signin", "/signup", "/forgot-password"];
 
-export async function middleware(request: NextRequest) {
-  const session = await auth();
-  const { pathname } = request.nextUrl;
+function hasSessionCookie(request: NextRequest) {
+  return Boolean(
+    request.cookies.get("__Secure-authjs.session-token")?.value ||
+    request.cookies.get("authjs.session-token")?.value ||
+    request.cookies.get("next-auth.session-token")?.value
+  );
+}
 
-  // Check if the path is a public route
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
   const isPublicRoute = publicRoutes.some(route =>
     route === pathname || pathname.startsWith(route)
   );
-
-  // Check if the path is an auth route (signin, signup, etc.)
   const isAuthRoute = authRoutes.some(route =>
     route === pathname || pathname.startsWith(route)
   );
+  const isSignedIn = hasSessionCookie(request);
 
-  // If user is not signed in and trying to access a protected route
-  if (!session?.user && !isPublicRoute) {
-    const signInUrl = new URL("/signin", request.url);
-    return NextResponse.redirect(signInUrl);
-  }
-
-  // If user is signed in and trying to access auth pages, redirect to dashboard
-  // BUT exclude the home page ("/") to allow signed-in users to visit it
-  if (session?.user && isAuthRoute) {
+  if (isSignedIn && isAuthRoute) {
     const dashboardUrl = new URL("/dashboard", request.url);
     return NextResponse.redirect(dashboardUrl);
+  }
+
+  if (!isSignedIn && !isPublicRoute) {
+    const signInUrl = new URL("/signin", request.url);
+    return NextResponse.redirect(signInUrl);
   }
 
   return NextResponse.next();

@@ -13,18 +13,27 @@ interface TicTacToeProps {
   partnerId: string;
   userName: string;
   partnerName: string;
+  initialOpponentJoined?: boolean;
 }
 
 type Player = 'heart' | 'promise';
 type Cell = Player | null;
 
-export function TicTacToe({ gameSessionId, userId, partnerId, userName, partnerName }: TicTacToeProps) {
+export function TicTacToe({
+  gameSessionId,
+  userId,
+  partnerId,
+  userName,
+  partnerName,
+  initialOpponentJoined = false,
+}: TicTacToeProps) {
   const [board, setBoard] = useState<Cell[]>(Array(9).fill(null));
   const [currentPlayer, setCurrentPlayer] = useState<Player>('heart');
   const [winner, setWinner] = useState<Player | 'draw' | null>(null);
   const [gameClient, setGameClient] = useState<GameClient | null>(null);
   const [playerSymbol, setPlayerSymbol] = useState<Player>('heart');
-  const [opponentJoined, setOpponentJoined] = useState(false);
+  const [opponentJoined, setOpponentJoined] = useState(initialOpponentJoined);
+  const [isGameSocketConnected, setIsGameSocketConnected] = useState(false);
   const [chatMessages, setChatMessages] = useState<Array<{ sender: string; message: string }>>([]);
 
 useEffect(() => {
@@ -81,6 +90,10 @@ useEffect(() => {
     }
   };
 
+  client.onConnectionChange = (connected) => {
+    setIsGameSocketConnected(connected);
+  };
+
   client.connect();
   setGameClient(client);
 
@@ -95,12 +108,61 @@ useEffect(() => {
 }, [opponentJoined]);
 
 useEffect(() => {
+  setOpponentJoined(initialOpponentJoined);
+}, [initialOpponentJoined]);
+
+useEffect(() => {
   // If partnerId equals userId, enable solo immediately
   if (partnerId === userId) {
     console.log('🎮 Solo mode enabled (partnerId === userId)');
     setOpponentJoined(true);
   }
 }, [partnerId, userId]);
+
+useEffect(() => {
+  if (opponentJoined || partnerId === userId) return;
+
+  let active = true;
+  let attempts = 0;
+
+  const nextDelay = () => {
+    // When websocket is healthy, poll sparingly as safety net.
+    if (isGameSocketConnected) return 10000;
+
+    // Backoff when websocket is unavailable to limit request cost.
+    if (attempts < 3) return 3000;
+    if (attempts < 8) return 5000;
+    return 10000;
+  };
+
+  const pollSession = async () => {
+    try {
+      attempts += 1;
+      const response = await fetch(`/api/games/session?sessionId=${encodeURIComponent(gameSessionId)}`, {
+        cache: 'no-store'
+      });
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (active && data?.opponentJoined) {
+        setOpponentJoined(true);
+        return;
+      }
+    } catch (error) {
+      console.error('🎮 Error polling game session:', error);
+    }
+
+    if (active) {
+      setTimeout(pollSession, nextDelay());
+    }
+  };
+
+  void pollSession();
+
+  return () => {
+    active = false;
+  };
+}, [gameSessionId, partnerId, userId, opponentJoined, isGameSocketConnected]);
 
 useEffect(() => {
   // Assign player symbol deterministically by comparing IDs (works for cuid/uuid strings)

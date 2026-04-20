@@ -31,6 +31,12 @@ export const useOnlineStatus = (userId?: string): OnlineStatusReturn => {
   const updatePresence = useCallback(async () => {
     if (!userId) return
 
+    // Prefer WebSocket for cheap real-time presence updates.
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'presence_update' }))
+      return
+    }
+
     try {
       const response = await fetch('/api/presence/update', {
         method: 'POST',
@@ -174,7 +180,7 @@ export const useOnlineStatus = (userId?: string): OnlineStatusReturn => {
     connectWebSocket()
 
     // Set up presence update interval
-    presenceIntervalRef.current = setInterval(updatePresence, 30000)
+    presenceIntervalRef.current = setInterval(updatePresence, 120000)
 
     // Initial presence update
     updatePresence()

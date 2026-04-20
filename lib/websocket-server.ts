@@ -1,6 +1,6 @@
 // lib/websocket-server.ts (Complete WebSocket server with messaging)
 import { WebSocketServer, WebSocket } from 'ws'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { IncomingMessage } from 'http'
 import { parse } from 'url'
 
@@ -10,6 +10,7 @@ interface Client {
   ws: WebSocket
   userId: string
   lastPing: Date
+  currentGameSessionId?: string
 }
 
 interface MessageData {
@@ -32,7 +33,7 @@ interface GameSession {
 
 class MessagingWebSocketServer {
   private wss: WebSocketServer
-  private clients: Map<string, Client> = new Map()
+  private clients: Map<string, Set<Client>> = new Map()
   private pingInterval!: NodeJS.Timeout
   private typingTimers: Map<string, NodeJS.Timeout> = new Map()
   private gameSessions: Map<string, GameSession> = new Map();
@@ -56,15 +57,11 @@ class MessagingWebSocketServer {
       }
 
       console.log(`User ${userId} connected to WebSocket`)
-      
-      // Remove existing connection if any
-      const existingClient = this.clients.get(userId)
-      if (existingClient) {
-        existingClient.ws.close(1000, 'New connection established')
-      }
 
-      // Store client connection
-      this.clients.set(userId, { ws, userId, lastPing: new Date() })
+      const client: Client = { ws, userId, lastPing: new Date() }
+      const userConnections = this.clients.get(userId) ?? new Set<Client>()
+      userConnections.add(client)
+      this.clients.set(userId, userConnections)
 
       // Update user's online status
       this.updateUserPresence(userId, true)
@@ -72,7 +69,7 @@ class MessagingWebSocketServer {
       ws.on('message', (data) => {
         try {
           const message = JSON.parse(data.toString())
-          this.handleMessage(userId, message)
+          this.handleMessage(userId, ws, message)
         } catch (error) {
           console.error('Error parsing WebSocket message:', error)
         }
@@ -80,17 +77,12 @@ class MessagingWebSocketServer {
 
       ws.on('close', () => {
         console.log(`User ${userId} disconnected`)
-        this.clients.delete(userId)
-        this.updateUserPresence(userId, false)
-        // Clear any typing indicators
-        this.clearTypingIndicator(userId)
+        this.removeClientConnection(userId, ws)
       })
 
       ws.on('error', (error) => {
         console.error('WebSocket error:', error)
-        this.clients.delete(userId)
-        this.updateUserPresence(userId, false)
-        this.clearTypingIndicator(userId)
+        this.removeClientConnection(userId, ws)
       })
 
       // Send initial presence data
@@ -98,14 +90,18 @@ class MessagingWebSocketServer {
     })
   }
 
-  private handleMessage(userId: string, message: { type: string; [key: string]: string | number | boolean | object | null }) {
-    const client = this.clients.get(userId)
-    if (!client) return
+  private handleMessage(userId: string, sourceWs: WebSocket, message: { type: string; [key: string]: string | number | boolean | object | null }) {
+    const connections = this.clients.get(userId)
+    if (!connections || connections.size === 0) return
+
+    const sourceClient = Array.from(connections).find((entry) => entry.ws === sourceWs)
 
     switch (message.type) {
       case 'ping':
-        client.lastPing = new Date()
-        client.ws.send(JSON.stringify({ type: 'pong' }))
+        if (sourceClient) {
+          sourceClient.lastPing = new Date()
+        }
+        sourceWs.send(JSON.stringify({ type: 'pong' }))
         break
       
       case 'presence_update':
@@ -137,11 +133,11 @@ class MessagingWebSocketServer {
         break
 
       case 'game_start':
-        this.handleGameStart(userId, message.gameSessionId as string)
+        void this.handleGameStart(userId, sourceWs, message.gameSessionId as string)
         break
 
       case 'game_move':
-        this.handleGameMove(userId, message.gameSessionId as string, message.data)
+        void this.handleGameMove(userId, message.gameSessionId as string, message.data)
         break
 
       case 'chat_message':
@@ -159,26 +155,22 @@ class MessagingWebSocketServer {
       const receiverId = messageData.receiverId
 
       // Send message to receiver if they're online
-      const receiverClient = this.clients.get(receiverId)
-      if (receiverClient) {
-        receiverClient.ws.send(JSON.stringify({
-          type: 'new_message',
-          message: messageData
-        }))
+      const receiverOnline = this.sendToUser(receiverId, {
+        type: 'new_message',
+        message: messageData
+      }) > 0
 
+      if (receiverOnline) {
         // Send updated unread count to receiver
         this.sendUnreadCount(receiverId)
       }
 
       // Send confirmation to sender
-      const senderClient = this.clients.get(senderId)
-      if (senderClient) {
-        senderClient.ws.send(JSON.stringify({
-          type: 'message_sent',
-          messageId: messageData.id,
-          tempId: messageData.tempId || null
-        }))
-      }
+      this.sendToUser(senderId, {
+        type: 'message_sent',
+        messageId: messageData.id,
+        tempId: messageData.tempId || null
+      })
 
       // Clear typing indicator since message was sent
       this.handleTypingIndicator(senderId, receiverId, false)
@@ -191,14 +183,11 @@ class MessagingWebSocketServer {
   private async handleMessageRead(userId: string, messageId: string, senderId: string) {
     try {
       // Notify sender that message was read
-      const senderClient = this.clients.get(senderId)
-      if (senderClient) {
-        senderClient.ws.send(JSON.stringify({
-          type: 'message_read',
-          messageId,
-          readBy: userId
-        }))
-      }
+      this.sendToUser(senderId, {
+        type: 'message_read',
+        messageId,
+        readBy: userId
+      })
 
       // Send updated unread count to the user who read the message
       this.sendUnreadCount(userId)
@@ -210,8 +199,8 @@ class MessagingWebSocketServer {
 
   private handleTypingIndicator(senderId: string, receiverId: string, isTyping: boolean) {
     try {
-      const receiverClient = this.clients.get(receiverId)
-      if (!receiverClient) return
+      const receiverClients = this.getOpenConnections(receiverId)
+      if (receiverClients.length === 0) return
 
       const typingKey = `${senderId}-${receiverId}`
 
@@ -223,11 +212,13 @@ class MessagingWebSocketServer {
         }
 
         // Send typing indicator
-        receiverClient.ws.send(JSON.stringify({
-          type: 'typing_indicator',
-          senderId,
-          isTyping: true
-        }))
+        for (const receiverClient of receiverClients) {
+          receiverClient.ws.send(JSON.stringify({
+            type: 'typing_indicator',
+            senderId,
+            isTyping: true
+          }))
+        }
 
         // Auto-clear typing after 3 seconds
         const timer = setTimeout(() => {
@@ -248,11 +239,13 @@ class MessagingWebSocketServer {
           this.typingTimers.delete(typingKey)
         }
 
-        receiverClient.ws.send(JSON.stringify({
-          type: 'typing_indicator',
-          senderId,
-          isTyping: false
-        }))
+        for (const receiverClient of receiverClients) {
+          receiverClient.ws.send(JSON.stringify({
+            type: 'typing_indicator',
+            senderId,
+            isTyping: false
+          }))
+        }
       }
     } catch (error) {
       console.error('Error handling typing indicator:', error)
@@ -273,9 +266,6 @@ class MessagingWebSocketServer {
 
   private async sendUnreadCount(userId: string) {
     try {
-      const client = this.clients.get(userId)
-      if (!client) return
-
       // Get unread message count for this user
       const unreadCount = await prisma.message.count({
         where: {
@@ -284,10 +274,10 @@ class MessagingWebSocketServer {
         }
       })
 
-      client.ws.send(JSON.stringify({
+      this.sendToUser(userId, {
         type: 'unread_count',
         count: unreadCount
-      }))
+      })
     } catch (error) {
       console.error('Error sending unread count:', error)
     }
@@ -337,14 +327,13 @@ class MessagingWebSocketServer {
 
       // Send presence update to connected partners
       partnerIds.forEach(partnerId => {
-        const partnerClient = this.clients.get(partnerId)
-        if (partnerClient) {
-          partnerClient.ws.send(JSON.stringify({
+        if (this.getOpenConnections(partnerId).length > 0) {
+          this.sendToUser(partnerId, {
             type: 'presence_change',
             userId,
             isOnline,
             timestamp: new Date().toISOString()
-          }))
+          })
         }
       })
     } catch (error) {
@@ -354,9 +343,6 @@ class MessagingWebSocketServer {
 
   private async sendPresenceUpdate(userId: string) {
     try {
-      const client = this.clients.get(userId)
-      if (!client) return
-
       // Get user's partner presence
       const relationships = await prisma.relationship.findMany({
         where: {
@@ -385,10 +371,10 @@ class MessagingWebSocketServer {
         }
       })
 
-      client.ws.send(JSON.stringify({
+      this.sendToUser(userId, {
         type: 'presence_update',
         partners: partnerPresence
-      }))
+      })
     } catch (error) {
       console.error('Error sending presence update:', error)
     }
@@ -399,16 +385,18 @@ class MessagingWebSocketServer {
       const now = new Date()
       const thirtySecondsAgo = new Date(now.getTime() - 30 * 1000)
 
-      this.clients.forEach((client, userId) => {
-        if (client.lastPing < thirtySecondsAgo) {
-          // Client hasn't responded to ping in 30 seconds, consider offline
-          client.ws.terminate()
-          this.clients.delete(userId)
-          this.updateUserPresence(userId, false)
-          this.clearTypingIndicator(userId)
-        } else {
-          // Send ping
-          client.ws.send(JSON.stringify({ type: 'ping' }))
+      this.clients.forEach((connections, userId) => {
+        for (const client of Array.from(connections)) {
+          if (client.lastPing < thirtySecondsAgo) {
+            // Connection hasn't responded to ping in 30 seconds, remove it.
+            client.ws.terminate()
+            this.removeClientConnection(userId, client.ws)
+          } else if (client.ws.readyState === WebSocket.OPEN) {
+            // Send ping
+            client.ws.send(JSON.stringify({ type: 'ping' }))
+          } else {
+            this.removeClientConnection(userId, client.ws)
+          }
         }
       })
     }, 15000) // Check every 15 seconds
@@ -424,26 +412,36 @@ class MessagingWebSocketServer {
 
   // Utility method to send message to specific user
   public sendToUser(userId: string, message: object) {
-    const client = this.clients.get(userId)
-    if (client && client.ws.readyState === WebSocket.OPEN) {
+    let sent = false
+    for (const client of this.getOpenConnections(userId)) {
       client.ws.send(JSON.stringify(message))
-      return true
+      sent = true
     }
-    return false
+    return sent
   }
 
   // Get connected users count
   public getConnectedUsersCount(): number {
-    return this.clients.size
+    let total = 0
+    this.clients.forEach((connections) => {
+      total += Array.from(connections).filter((entry) => entry.ws.readyState === WebSocket.OPEN).length
+    })
+    return total
   }
 
   // Get connected user IDs
   public getConnectedUserIds(): string[] {
-    return Array.from(this.clients.keys())
+    return Array.from(this.clients.keys()).filter((userId) => this.getOpenConnections(userId).length > 0)
   }
 
-  private handleGameStart(userId: string, gameSessionId: string) {
+  private async handleGameStart(userId: string, sourceWs: WebSocket, gameSessionId: string) {
     console.log(`🎮 handleGameStart: User ${userId} joining session ${gameSessionId}`);
+
+    const sourceClient = this.findClientConnection(userId, sourceWs)
+    if (sourceClient) {
+      sourceClient.currentGameSessionId = gameSessionId
+      sourceClient.lastPing = new Date()
+    }
     
     let session = this.gameSessions.get(gameSessionId);
     
@@ -464,7 +462,7 @@ class MessagingWebSocketServer {
       console.log(`🎮 Session exists. Current players:`, Array.from(session.players));
       
       // First, notify the NEW player about ALL existing players
-      const client = this.clients.get(userId);
+      const client = sourceClient;
       if (client && client.ws.readyState === WebSocket.OPEN) {
         session.players.forEach(existingPlayerId => {
           if (existingPlayerId !== userId) {
@@ -485,8 +483,23 @@ class MessagingWebSocketServer {
       console.log(`🎮 Added ${userId} to session. New player count: ${session.players.size}`);
     }
 
+    // Load persisted game state from DB if present.
+    if (!session.gameState) {
+      try {
+        const persistedSession = await prisma.gameSession.findUnique({
+          where: { id: gameSessionId },
+          select: { gameState: true }
+        })
+        if (persistedSession?.gameState) {
+          session.gameState = persistedSession.gameState
+        }
+      } catch (error) {
+        console.error('Error loading persisted game state:', error)
+      }
+    }
+
     if (session.gameState) {
-      const client = this.clients.get(userId);
+      const client = sourceClient;
       if (client && client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(JSON.stringify({
           type: 'game_state',
@@ -506,12 +519,22 @@ class MessagingWebSocketServer {
     console.log(`🎮 Broadcast sent to ${broadcastCount} players`);
   }
 
-  private handleGameMove(userId: string, gameSessionId: string, moveData: unknown) {
+  private async handleGameMove(userId: string, gameSessionId: string, moveData: unknown) {
     const session = this.gameSessions.get(gameSessionId);
     if (!session) return;
 
     // Update game state
     session.gameState = moveData;
+
+    // Persist state for reconnects / refreshes.
+    try {
+      await prisma.gameSession.update({
+        where: { id: gameSessionId },
+        data: { gameState: moveData as Prisma.InputJsonValue }
+      })
+    } catch (error) {
+      console.error('Error persisting game state:', error)
+    }
 
     // Broadcast move to all players in the session
     this.broadcastToGameSession(gameSessionId, {
@@ -560,17 +583,51 @@ class MessagingWebSocketServer {
         return;
       }
       
-      const client = this.clients.get(playerId);
-      if (client && client.ws.readyState === WebSocket.OPEN) {
-        client.ws.send(JSON.stringify(message));
+      const connections = this.getOpenConnections(playerId).filter(
+        (client) => client.currentGameSessionId === gameSessionId
+      )
+
+      if (connections.length > 0) {
+        for (const client of connections) {
+          client.ws.send(JSON.stringify(message));
+          sentCount++;
+        }
         console.log(`✅ Sent message to ${playerId}:`, message);
-        sentCount++;
       } else {
-        console.warn(`⚠️ Could not send to ${playerId} - client not found or connection not open`);
+        console.warn(`⚠️ Could not send to ${playerId} - no open game socket for session ${gameSessionId}`);
       }
     });
     
     return sentCount;
+  }
+
+  private findClientConnection(userId: string, ws: WebSocket): Client | undefined {
+    const connections = this.clients.get(userId)
+    if (!connections) return undefined
+    return Array.from(connections).find((entry) => entry.ws === ws)
+  }
+
+  private getOpenConnections(userId: string): Client[] {
+    const connections = this.clients.get(userId)
+    if (!connections) return []
+    return Array.from(connections).filter((entry) => entry.ws.readyState === WebSocket.OPEN)
+  }
+
+  private removeClientConnection(userId: string, ws: WebSocket) {
+    const connections = this.clients.get(userId)
+    if (!connections) return
+
+    for (const client of Array.from(connections)) {
+      if (client.ws === ws) {
+        connections.delete(client)
+      }
+    }
+
+    if (connections.size === 0) {
+      this.clients.delete(userId)
+      this.updateUserPresence(userId, false)
+      this.clearTypingIndicator(userId)
+    }
   }
 }
 

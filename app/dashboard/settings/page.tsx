@@ -1,241 +1,318 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { Loader2 } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2 } from "lucide-react"
 
-interface User {
+type ConnectionUser = {
   id: string
-  firstName: string
-  lastName: string
+  name: string | null
+  email: string
+}
+
+type ProfileUser = {
+  id: string
+  name: string | null
   email: string
   bio: string | null
-  profilePicture: string | null
   notifications: {
     email: boolean
     push: boolean
     reminders: boolean
     partnerActivity: boolean
   }
-  partnerId: string | null
-  partner: {
-    id: string
-    firstName: string
-    lastName: string
-    email: string
-  } | null
+  partner: ConnectionUser | null
+}
+
+type SearchUser = {
+  id: string
+  name: string | null
+  email: string
+}
+
+type IncomingInvitation = {
+  id: string
+  createdAt: string
+  user: ConnectionUser
+}
+
+type OutgoingInvitation = {
+  id: string
+  createdAt: string
+  partner: ConnectionUser
+}
+
+function displayName(name: string | null | undefined, email: string) {
+  if (name && name.trim().length > 0) return name.trim()
+  return email.split("@")[0]
+}
+
+function initials(name: string | null | undefined, email: string) {
+  const safe = displayName(name, email)
+  const parts = safe.split(" ").filter(Boolean)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase()
 }
 
 export default function SettingsPage() {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<ProfileUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [partnerEmail, setPartnerEmail] = useState("")
+  const [updatingInvitations, setUpdatingInvitations] = useState(false)
+
+  const [partnerQuery, setPartnerQuery] = useState("")
+  const [searchingUsers, setSearchingUsers] = useState(false)
+  const [searchResults, setSearchResults] = useState<SearchUser[]>([])
+
+  const [incomingInvitations, setIncomingInvitations] = useState<IncomingInvitation[]>([])
+  const [outgoingInvitations, setOutgoingInvitations] = useState<OutgoingInvitation[]>([])
+
   const [passwords, setPasswords] = useState({
     current: "",
     new: "",
-    confirm: ""
+    confirm: "",
   })
+
   const { toast } = useToast()
 
-  // Load user data on component mount
+  const canSearchUsers = useMemo(() => partnerQuery.trim().length >= 2, [partnerQuery])
+
   useEffect(() => {
-    fetchUserData()
+    void loadInitialData()
   }, [])
 
-  const fetchUserData = async () => {
-    try {
-      const response = await fetch('/api/user/profile')
-      if (response.ok) {
-        const userData = await response.json()
-        setUser(userData)
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to load user data",
-          variant: "destructive"
-        })
+  useEffect(() => {
+    if (!canSearchUsers) {
+      setSearchResults([])
+      return
+    }
+
+    let active = true
+    setSearchingUsers(true)
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/user/search?q=${encodeURIComponent(partnerQuery.trim())}`)
+        if (!response.ok) {
+          throw new Error("Failed to search users")
+        }
+        const data = (await response.json()) as SearchUser[]
+        if (active) {
+          setSearchResults(data)
+        }
+      } catch {
+        if (active) {
+          setSearchResults([])
+        }
+      } finally {
+        if (active) {
+          setSearchingUsers(false)
+        }
       }
-    } catch {
-      toast({
-        title: "Error",
-        description: "Failed to load user data",
-        variant: "destructive"
-      })
+    }, 250)
+
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [partnerQuery, canSearchUsers])
+
+  async function loadInitialData() {
+    setLoading(true)
+    try {
+      await Promise.all([fetchUserData(), fetchInvitations()])
     } finally {
       setLoading(false)
     }
   }
 
-  const updateProfile = async () => {
+  async function fetchUserData() {
+    try {
+      const response = await fetch("/api/user/profile")
+      if (!response.ok) {
+        throw new Error("Failed to load user data")
+      }
+      const userData = (await response.json()) as ProfileUser
+      setUser(userData)
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to load user data",
+        variant: "destructive",
+      })
+    }
+  }
+
+  async function fetchInvitations() {
+    try {
+      const response = await fetch("/api/user/partner/invitations")
+      if (!response.ok) {
+        throw new Error("Failed to load invitations")
+      }
+      const payload = (await response.json()) as {
+        incoming: IncomingInvitation[]
+        outgoing: OutgoingInvitation[]
+      }
+      setIncomingInvitations(payload.incoming ?? [])
+      setOutgoingInvitations(payload.outgoing ?? [])
+    } catch {
+      setIncomingInvitations([])
+      setOutgoingInvitations([])
+    }
+  }
+
+  async function updateProfile() {
     if (!user) return
-    
+
     setSaving(true)
     try {
-      const response = await fetch('/api/user/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch("/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          firstName: user.firstName,
-          lastName: user.lastName,
+          name: user.name,
           email: user.email,
           bio: user.bio,
         }),
       })
 
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Profile updated successfully",
-        })
-      } else {
+      if (!response.ok) {
         const error = await response.json()
-        toast({
-          title: "Error",
-          description: error.message || "Failed to update profile",
-          variant: "destructive"
-        })
+        throw new Error(error.error || "Failed to update profile")
       }
-    } catch{
-      toast({
-        title: "Error",
-        description: "Failed to update profile",
-        variant: "destructive"
-      })
+
+      toast({ title: "Success", description: "Profile updated successfully" })
+      await fetchUserData()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update profile"
+      toast({ title: "Error", description: message, variant: "destructive" })
     } finally {
       setSaving(false)
     }
   }
 
-  const updateNotifications = async () => {
+  async function updateNotifications() {
     if (!user) return
-    
+
     setSaving(true)
     try {
-      const response = await fetch('/api/user/notifications', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch("/api/user/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(user.notifications),
       })
 
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Notification preferences updated",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to update notifications",
-          variant: "destructive"
-        })
+      if (!response.ok) {
+        throw new Error("Failed to update notifications")
       }
-    } catch{
+
+      toast({ title: "Success", description: "Notification preferences updated" })
+    } catch {
       toast({
         title: "Error",
         description: "Failed to update notifications",
-        variant: "destructive"
+        variant: "destructive",
       })
     } finally {
       setSaving(false)
     }
   }
 
-  const sendPartnerInvite = async () => {
-    if (!partnerEmail.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter an email address",
-        variant: "destructive"
-      })
-      return
-    }
-
+  async function invitePartner(input: { userId?: string; email?: string }) {
     setSaving(true)
     try {
-      const response = await fetch('/api/user/partner/invite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: partnerEmail }),
+      const response = await fetch("/api/user/partner/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
       })
 
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Partner invitation sent successfully",
-        })
-        setPartnerEmail("")
-      } else {
+      if (!response.ok) {
         const error = await response.json()
-        toast({
-          title: "Error",
-          description: error.message || "Failed to send invitation",
-          variant: "destructive"
-        })
+        throw new Error(error.error || "Failed to send invitation")
       }
-    } catch{
-      toast({
-        title: "Error",
-        description: "Failed to send invitation",
-        variant: "destructive"
-      })
+
+      toast({ title: "Success", description: "Invitation sent" })
+      setPartnerQuery("")
+      setSearchResults([])
+      await fetchInvitations()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to send invitation"
+      toast({ title: "Error", description: message, variant: "destructive" })
     } finally {
       setSaving(false)
     }
   }
 
-  const disconnectPartner = async () => {
+  async function approveInvitation(id: string) {
+    setUpdatingInvitations(true)
+    try {
+      const response = await fetch(`/api/user/partner/invitations/${id}/accept`, {
+        method: "POST",
+      })
+      if (!response.ok) {
+        throw new Error("Failed to accept invitation")
+      }
+      toast({ title: "Success", description: "Invitation accepted" })
+      await Promise.all([fetchUserData(), fetchInvitations()])
+    } catch {
+      toast({ title: "Error", description: "Failed to accept invitation", variant: "destructive" })
+    } finally {
+      setUpdatingInvitations(false)
+    }
+  }
+
+  async function declineInvitation(id: string) {
+    setUpdatingInvitations(true)
+    try {
+      const response = await fetch(`/api/user/partner/invitations/${id}/decline`, {
+        method: "POST",
+      })
+      if (!response.ok) {
+        throw new Error("Failed to decline invitation")
+      }
+      toast({ title: "Success", description: "Invitation declined" })
+      await fetchInvitations()
+    } catch {
+      toast({ title: "Error", description: "Failed to decline invitation", variant: "destructive" })
+    } finally {
+      setUpdatingInvitations(false)
+    }
+  }
+
+  async function disconnectPartner() {
     setSaving(true)
     try {
-      const response = await fetch('/api/user/partner/disconnect', {
-        method: 'POST',
-      })
+      const response = await fetch("/api/user/partner/disconnect", { method: "POST" })
 
-      if (response.ok) {
-        setUser(prev => prev ? { ...prev, partnerId: null, partner: null } : null)
-        toast({
-          title: "Success",
-          description: "Partner disconnected successfully",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to disconnect partner",
-          variant: "destructive"
-        })
+      if (!response.ok) {
+        throw new Error("Failed to disconnect partner")
       }
-    } catch{
-      toast({
-        title: "Error",
-        description: "Failed to disconnect partner",
-        variant: "destructive"
-      })
+
+      toast({ title: "Success", description: "Partner disconnected" })
+      await Promise.all([fetchUserData(), fetchInvitations()])
+    } catch {
+      toast({ title: "Error", description: "Failed to disconnect partner", variant: "destructive" })
     } finally {
       setSaving(false)
     }
   }
 
-  const updatePassword = async () => {
+  async function updatePassword() {
     if (!passwords.current || !passwords.new || !passwords.confirm) {
       toast({
         title: "Error",
         description: "Please fill in all password fields",
-        variant: "destructive"
+        variant: "destructive",
       })
       return
     }
@@ -243,45 +320,31 @@ export default function SettingsPage() {
     if (passwords.new !== passwords.confirm) {
       toast({
         title: "Error",
-        description: "New passwords don't match",
-        variant: "destructive"
+        description: "New passwords do not match",
+        variant: "destructive",
       })
       return
     }
 
     setSaving(true)
     try {
-      const response = await fetch('/api/user/password', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch("/api/user/password", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           currentPassword: passwords.current,
           newPassword: passwords.new,
         }),
       })
 
-      if (response.ok) {
-        setPasswords({ current: "", new: "", confirm: "" })
-        toast({
-          title: "Success",
-          description: "Password updated successfully",
-        })
-      } else {
-        const error = await response.json()
-        toast({
-          title: "Error",
-          description: error.message || "Failed to update password",
-          variant: "destructive"
-        })
+      if (!response.ok) {
+        throw new Error("Failed to update password")
       }
-    } catch{
-      toast({
-        title: "Error",
-        description: "Failed to update password",
-        variant: "destructive"
-      })
+
+      setPasswords({ current: "", new: "", confirm: "" })
+      toast({ title: "Success", description: "Password updated successfully" })
+    } catch {
+      toast({ title: "Error", description: "Failed to update password", variant: "destructive" })
     } finally {
       setSaving(false)
     }
@@ -289,7 +352,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex min-h-[400px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
@@ -297,7 +360,7 @@ export default function SettingsPage() {
 
   if (!user) {
     return (
-      <div className="text-center py-8">
+      <div className="py-8 text-center">
         <p>Failed to load user data. Please refresh the page.</p>
       </div>
     )
@@ -307,9 +370,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences.
-        </p>
+        <p className="text-muted-foreground">Manage your account settings and preferences.</p>
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
@@ -318,343 +379,318 @@ export default function SettingsPage() {
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="profile" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Profile Information</CardTitle>
-              <CardDescription>
-                Update your personal information
-              </CardDescription>
+              <CardDescription>Update your personal information</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-col items-center space-y-4 sm:flex-row sm:items-start sm:space-x-4 sm:space-y-0">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={user.profilePicture || "/placeholder.svg?height=96&width=96"} alt="User" />
-                  <AvatarFallback className="text-2xl">
-                    {user.firstName[0]}{user.lastName[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-medium">Profile Picture</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Upload a new profile picture
-                  </p>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline">
-                      Upload
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              
-              <Separator />
-              
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First name</Label>
-                  <Input 
-                    id="firstName" 
-                    value={user.firstName}
-                    onChange={(e) => setUser({...user, firstName: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last name</Label>
-                  <Input 
-                    id="lastName" 
-                    value={user.lastName}
-                    onChange={(e) => setUser({...user, lastName: e.target.value})}
-                  />
-                </div>
-              </div>
-              
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  value={user.email}
-                  onChange={(e) => setUser({...user, email: e.target.value})}
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={user.name ?? ""}
+                  onChange={(e) => setUser({ ...user, name: e.target.value })}
                 />
               </div>
-              
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={user.email}
+                  onChange={(e) => setUser({ ...user, email: e.target.value })}
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="bio">Bio</Label>
-                <Textarea 
-                  id="bio" 
-                  value={user.bio || ""}
-                  onChange={(e) => setUser({...user, bio: e.target.value})}
+                <Textarea
+                  id="bio"
+                  value={user.bio ?? ""}
+                  onChange={(e) => setUser({ ...user, bio: e.target.value })}
                   className="min-h-[100px]"
                 />
               </div>
             </CardContent>
             <CardFooter>
-              <Button 
-                className="ml-auto" 
-                onClick={updateProfile}
-                disabled={saving}
-              >
+              <Button className="ml-auto" onClick={updateProfile} disabled={saving}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
               </Button>
             </CardFooter>
           </Card>
-          
-          <Card>
+
+          <Card id="relationship-invites">
             <CardHeader>
               <CardTitle>Partner Connection</CardTitle>
               <CardDescription>
-                Manage your connection with your partner
+                Search by name or email, send an invite in one click, and manage approvals.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-5">
               {user.partner ? (
-                <>
-                  <div className="flex items-center justify-between">
+                <div className="rounded-md border p-3">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarFallback>
-                          {user.partner.firstName[0]}{user.partner.lastName[0]}
-                        </AvatarFallback>
+                        <AvatarFallback>{initials(user.partner.name, user.partner.email)}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">
-                          {user.partner.firstName} {user.partner.lastName}
-                        </p>
-                        <p className="text-sm text-muted-foreground">Connected</p>
+                        <p className="font-medium">{displayName(user.partner.name, user.partner.email)}</p>
+                        <p className="text-sm text-muted-foreground">{user.partner.email}</p>
                       </div>
                     </div>
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={disconnectPartner}
-                      disabled={saving}
-                    >
-                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button variant="destructive" size="sm" onClick={disconnectPartner} disabled={saving}>
                       Disconnect
                     </Button>
                   </div>
-                  <Separator className="my-4" />
-                </>
-              ) : null}
-              
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium">
-                  {user.partner ? "Invite Another Partner" : "Invite a Partner"}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Send an invitation to connect with your partner
-                </p>
-                <div className="flex gap-2">
-                  <Input 
-                    placeholder="Enter email address"
-                    value={partnerEmail}
-                    onChange={(e) => setPartnerEmail(e.target.value)}
-                  />
-                  <Button 
-                    onClick={sendPartnerInvite}
-                    disabled={saving}
-                  >
-                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Send Invite
-                  </Button>
                 </div>
+              ) : null}
+
+              <div className="space-y-2">
+                <Label htmlFor="partner-search">Find partner by name or email</Label>
+                <Input
+                  id="partner-search"
+                  placeholder="Type a name or email"
+                  value={partnerQuery}
+                  onChange={(e) => setPartnerQuery(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  We only show results after you search. No full user list is exposed.
+                </p>
+              </div>
+
+              {searchingUsers ? (
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Searching users...
+                </div>
+              ) : null}
+
+              {canSearchUsers && searchResults.length > 0 ? (
+                <div className="space-y-2 rounded-md border p-3">
+                  {searchResults.map((result) => (
+                    <div key={result.id} className="flex items-center justify-between gap-3 rounded-sm border p-2">
+                      <div>
+                        <p className="font-medium">{displayName(result.name, result.email)}</p>
+                        <p className="text-xs text-muted-foreground">{result.email}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => invitePartner({ userId: result.id })}
+                        disabled={saving || updatingInvitations}
+                      >
+                        Invite
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {partnerQuery.includes("@") ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => invitePartner({ email: partnerQuery.trim() })}
+                    disabled={saving || updatingInvitations}
+                  >
+                    Invite this email
+                  </Button>
+                  <p className="text-xs text-muted-foreground">Works even if no search result is shown.</p>
+                </div>
+              ) : null}
+
+              <Separator />
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Incoming invitations</h3>
+                {incomingInvitations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No pending invitations.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {incomingInvitations.map((inv) => (
+                      <div key={inv.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
+                        <div>
+                          <p className="font-medium">{displayName(inv.user.name, inv.user.email)}</p>
+                          <p className="text-xs text-muted-foreground">{inv.user.email}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => approveInvitation(inv.id)}
+                            disabled={updatingInvitations || saving}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => declineInvitation(inv.id)}
+                            disabled={updatingInvitations || saving}
+                          >
+                            Decline
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Outgoing invitations</h3>
+                {outgoingInvitations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No outgoing invites.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {outgoingInvitations.map((inv) => (
+                      <div key={inv.id} className="rounded-md border p-3">
+                        <p className="font-medium">{displayName(inv.partner.name, inv.partner.email)}</p>
+                        <p className="text-xs text-muted-foreground">Pending approval: {inv.partner.email}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="notifications" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Notification Settings</CardTitle>
-              <CardDescription>
-                Configure how you want to receive notifications
-              </CardDescription>
+              <CardDescription>Configure how you want to receive notifications</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Email Notifications</h3>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="email-notifications">Email Notifications</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive email notifications about important updates
-                    </p>
-                  </div>
-                  <Switch 
-                    id="email-notifications" 
-                    checked={user.notifications.email}
-                    onCheckedChange={(checked) => 
-                      setUser({
-                        ...user, 
-                        notifications: {...user.notifications, email: checked}
-                      })
-                    }
-                  />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="email-notifications">Email Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Receive email notifications about updates</p>
                 </div>
+                <Switch
+                  id="email-notifications"
+                  checked={user.notifications.email}
+                  onCheckedChange={(checked) =>
+                    setUser({
+                      ...user,
+                      notifications: { ...user.notifications, email: checked },
+                    })
+                  }
+                />
               </div>
-              
+
               <Separator />
-              
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Push Notifications</h3>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="push-notifications">Push Notifications</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive push notifications on your device
-                    </p>
-                  </div>
-                  <Switch 
-                    id="push-notifications" 
-                    checked={user.notifications.push}
-                    onCheckedChange={(checked) => 
-                      setUser({
-                        ...user, 
-                        notifications: {...user.notifications, push: checked}
-                      })
-                    }
-                  />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="push-notifications">Push Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Receive push notifications on your device</p>
                 </div>
+                <Switch
+                  id="push-notifications"
+                  checked={user.notifications.push}
+                  onCheckedChange={(checked) =>
+                    setUser({
+                      ...user,
+                      notifications: { ...user.notifications, push: checked },
+                    })
+                  }
+                />
               </div>
-              
+
               <Separator />
-              
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Event Reminders</h3>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="event-reminders">Event Reminders</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get reminders for upcoming events and anniversaries
-                    </p>
-                  </div>
-                  <Switch 
-                    id="event-reminders" 
-                    checked={user.notifications.reminders}
-                    onCheckedChange={(checked) => 
-                      setUser({
-                        ...user, 
-                        notifications: {...user.notifications, reminders: checked}
-                      })
-                    }
-                  />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="event-reminders">Event Reminders</Label>
+                  <p className="text-sm text-muted-foreground">Get reminders for upcoming events</p>
                 </div>
+                <Switch
+                  id="event-reminders"
+                  checked={user.notifications.reminders}
+                  onCheckedChange={(checked) =>
+                    setUser({
+                      ...user,
+                      notifications: { ...user.notifications, reminders: checked },
+                    })
+                  }
+                />
               </div>
-              
+
               <Separator />
-              
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Partner Activity</h3>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="partner-activity">Partner Activity</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified when your partner adds new content
-                    </p>
-                  </div>
-                  <Switch 
-                    id="partner-activity" 
-                    checked={user.notifications.partnerActivity}
-                    onCheckedChange={(checked) => 
-                      setUser({
-                        ...user, 
-                        notifications: {...user.notifications, partnerActivity: checked}
-                      })
-                    }
-                  />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="partner-activity">Partner Activity</Label>
+                  <p className="text-sm text-muted-foreground">Get notified when your partner adds new content</p>
                 </div>
+                <Switch
+                  id="partner-activity"
+                  checked={user.notifications.partnerActivity}
+                  onCheckedChange={(checked) =>
+                    setUser({
+                      ...user,
+                      notifications: { ...user.notifications, partnerActivity: checked },
+                    })
+                  }
+                />
               </div>
             </CardContent>
             <CardFooter>
-              <Button 
-                className="ml-auto"
-                onClick={updateNotifications}
-                disabled={saving}
-              >
+              <Button className="ml-auto" onClick={updateNotifications} disabled={saving}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Preferences
               </Button>
             </CardFooter>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="security" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Security Settings</CardTitle>
-              <CardDescription>
-                Manage your password and security preferences
-              </CardDescription>
+              <CardDescription>Manage your password and security preferences</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Change Password</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="current-password">Current Password</Label>
-                  <Input 
-                    id="current-password" 
-                    type="password"
-                    value={passwords.current}
-                    onChange={(e) => setPasswords({...passwords, current: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input 
-                    id="new-password" 
-                    type="password"
-                    value={passwords.new}
-                    onChange={(e) => setPasswords({...passwords, new: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm New Password</Label>
-                  <Input 
-                    id="confirm-password" 
-                    type="password"
-                    value={passwords.confirm}
-                    onChange={(e) => setPasswords({...passwords, confirm: e.target.value})}
-                  />
-                </div>
-                <Button 
-                  onClick={updatePassword}
-                  disabled={saving}
-                >
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Update Password
-                </Button>
+              <div className="space-y-2">
+                <Label htmlFor="current-password">Current Password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  value={passwords.current}
+                  onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+                />
               </div>
-              
-              <Separator />
-              
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Two-Factor Authentication</h3>
-                <p className="text-sm text-muted-foreground">
-                  Add an extra layer of security to your account
-                </p>
-                <Button variant="outline">Enable Two-Factor Authentication</Button>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={passwords.new}
+                  onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                />
               </div>
-              
-              <Separator />
-              
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Privacy Settings</h3>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="private-journal">Private Journal Entries</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Make all new journal entries private by default
-                    </p>
-                  </div>
-                  <Switch id="private-journal" />
-                </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm New Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={passwords.confirm}
+                  onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                />
               </div>
+
+              <Button onClick={updatePassword} disabled={saving}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Password
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
