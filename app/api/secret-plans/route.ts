@@ -1,61 +1,44 @@
-// GET /api/secret-plans
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-// Get all secret plans for the authenticated user
+// app/api/secret-plans/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import * as SecretPlanService from "@/domains/secret-plan/service";
+import * as UserService from "@/domains/user/service";
+
 export async function GET() {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const secretPlans = await prisma.secretPlan.findMany({
-      where: {
-        userId: session.user.id
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
-
-    return NextResponse.json(secretPlans)
-  } catch (error) {
-    console.error('Error fetching secret plans:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const user = await UserService.getCurrentUser();
+    const plans = await SecretPlanService.getSecretPlans(user.id);
+    return NextResponse.json(plans);
+  } catch (error: any) {
+    console.error("Error fetching secret plans:", error);
+    const status =
+      error.message === "Not authenticated"
+        ? 401
+        : error.message === "User not found"
+        ? 404
+        : 500;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }
 
-// POST /api/secret-plans
-// Create a new secret plan
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const user = await UserService.getCurrentUser();
+    const body = await request.json();
 
-    const body = await request.json()
-    const { title, description, budget, targetDate, progress } = body
+    const plan = await SecretPlanService.createSecretPlan({
+      ...body,
+      userId: user.id,
+    });
 
-    if (!title) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
-    }
-
-    const secretPlan = await prisma.secretPlan.create({
-      data: {
-        title,
-        description,
-        budget,
-        targetDate: targetDate ? new Date(targetDate) : null,
-        progress: progress || 0,
-        userId: session.user.id
-      }
-    })
-
-    return NextResponse.json(secretPlan)
-  } catch (error) {
-    console.error('Error creating secret plan:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json(plan, { status: 201 });
+  } catch (error: any) {
+    console.error("Error creating secret plan:", error);
+    const status =
+      error.message === "Not authenticated"
+        ? 401
+        : error.message === "User not found"
+        ? 404
+        : 500;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }

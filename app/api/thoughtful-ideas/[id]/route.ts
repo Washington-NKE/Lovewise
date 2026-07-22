@@ -1,59 +1,35 @@
 // app/api/thoughtful-ideas/[id]/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { NextRequest, NextResponse } from "next/server";
+import * as ThoughtfulIdeaService from "@/domains/thoughtful-idea/service";
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { id } = await params;
+    const body = await request.json();
+    const { title, description, type, progress, targetDate, completed } = body;
 
-    const currentUser = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
+    const thoughtfulIdea = await ThoughtfulIdeaService.updateThoughtfulIdea(id, {
+      title,
+      description,
+      type,
+      progress,
+      targetDate,
+      completed,
+    });
 
-    if (!currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const { id } = await params
-    const body = await request.json()
-    const { title, description, type, progress, targetDate, completed } = body
-
-    const existingIdea = await prisma.thoughtfulIdea.findUnique({
-      where: { id }
-    })
-
-    if (!existingIdea) {
-      return NextResponse.json({ error: 'Thoughtful idea not found' }, { status: 404 })
-    }
-
-    if (existingIdea.userId !== currentUser.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    const thoughtfulIdea = await prisma.thoughtfulIdea.update({
-      where: { id },
-      data: {
-        title,
-        description,
-        type,
-        progress,
-        targetDate,
-        completed
-      }
-    })
-
-    return NextResponse.json(thoughtfulIdea)
-  } catch (error) {
-    console.error('Error updating thoughtful idea:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json(thoughtfulIdea);
+  } catch (error: any) {
+    console.error("Error updating thoughtful idea:", error);
+    const status =
+      error.message === "Not authenticated"
+        ? 401
+        : error.message === "Thoughtful idea not found"
+        ? 404
+        : 500;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }
 
@@ -62,41 +38,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { id } = await params;
 
-    const currentUser = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const { id } = await params
-
-    const existingIdea = await prisma.thoughtfulIdea.findUnique({
-      where: { id }
-    })
-
-    if (!existingIdea) {
-      return NextResponse.json({ error: 'Thoughtful idea not found' }, { status: 404 })
-    }
-
-    if (existingIdea.userId !== currentUser.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    await prisma.thoughtfulIdea.delete({
-      where: { id }
-    })
-
-    return NextResponse.json({ message: 'Thoughtful idea deleted successfully' })
-  } catch (error) {
-    console.error('Error deleting thoughtful idea:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    await ThoughtfulIdeaService.deleteThoughtfulIdea(id);
+    return NextResponse.json({ message: "Thoughtful idea deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting thoughtful idea:", error);
+    const status =
+      error.message === "Not authenticated"
+        ? 401
+        : error.message === "Thoughtful idea not found"
+        ? 404
+        : 500;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }

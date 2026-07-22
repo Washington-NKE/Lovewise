@@ -35,7 +35,7 @@ export default function Home() {
                   Sign In
                 </Button>
               </Link>
-              <Link href="/signup">
+              <Link href="/signin">
                 <Button size="sm" className="bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white border-none transition-all duration-300 shadow-md hover:shadow-lg">Get Started</Button>
               </Link>
             </nav>
@@ -60,7 +60,7 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-3 min-[400px]:flex-row">
-                  <Link href="/signup">
+                  <Link href="/signin">
                     <Button size="lg" className="w-full bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-300">
                       Begin Your Love Story <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
@@ -200,7 +200,7 @@ export default function Home() {
               <p className="max-w-[85%] text-rose-100 sm:text-xl">
                 Create your private sanctuary and invite your lover to join you.
               </p>
-              <Link href="/signup">
+              <Link href="/signin">
                 <Button size="lg" className="bg-white text-rose-600 hover:bg-rose-100 font-semibold shadow-lg transform hover:scale-105 transition-all duration-300">
                   Start Your Love Story <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>

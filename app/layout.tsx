@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Angela & Washington Macharia",
-  description: "Couple Journal",
+  title: "Love by Washington",
+  description: "Couple",
 };
 
 const RootLayout = async ({

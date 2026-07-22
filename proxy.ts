@@ -25,7 +25,9 @@ export async function proxy(request: NextRequest) {
   );
   const isSignedIn = hasSessionCookie(request);
 
-  if (isSignedIn && isAuthRoute) {
+  const hasError = request.nextUrl.searchParams.has("error") || request.nextUrl.searchParams.has("session_expired");
+
+  if (isSignedIn && isAuthRoute && !hasError) {
     const dashboardUrl = new URL("/dashboard", request.url);
     return NextResponse.redirect(dashboardUrl);
   }

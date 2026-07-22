@@ -1,36 +1,20 @@
+// app/api/auth/me/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import * as UserService from "@/domains/user/service";
 
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
-
-// GET /api/auth/me - Get current user
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        profileImage: true,
-        lastActive: true
-      }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    return NextResponse.json(user)
-  } catch (error) {
-    console.error('Error fetching current user:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const user = await UserService.getCurrentUser();
+    return NextResponse.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      profileImage: user.profileImage,
+      lastActive: user.lastActive,
+    });
+  } catch (error: any) {
+    console.error("Error fetching current user:", error);
+    const status = error.message === "Not authenticated" ? 401 : error.message === "User not found" ? 404 : 500;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }

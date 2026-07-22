@@ -1,10 +1,8 @@
-// lib/websocket-server.ts (Complete WebSocket server with messaging)
 import { WebSocketServer, WebSocket } from 'ws'
-import { PrismaClient, Prisma } from '@prisma/client'
 import { IncomingMessage } from 'http'
 import { parse } from 'url'
-
-const prisma = new PrismaClient()
+import { prisma } from './prisma'
+import { Prisma } from '@prisma/client'
 
 interface Client {
   ws: WebSocket

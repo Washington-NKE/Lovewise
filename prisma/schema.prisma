@@ -7,7 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -28,7 +27,8 @@ model User {
   profileImage    String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
-  role            String    @default("user")
+  role                String    @default("user")
+  needsPasswordChange Boolean   @default(false)
   lovePact        LovePact? @relation(fields: [lovePactId], references: [id])
   lovePactId      String?
 
@@ -501,4 +501,14 @@ model GamePrompt  {
   type          PromptType
   content       String
   game          Game      @relation(fields: [gameId], references: [id])
+}
+
+model PageSecurity {
+  id        String   @id @default(cuid())
+  pagePath  String   @unique
+  pin       String?  // 4-digit pin
+  password  String?  // or password
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -15,7 +15,7 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   if (!session) {
-    redirect('/signin');
+    redirect('/signin?error=session_expired');
   }
 
   // Get the current user's ID from database using email
@@ -24,7 +24,12 @@ export default async function DashboardLayout({
   });
 
   if (!currentUser) {
-    redirect('/signin');
+    redirect('/signin?error=session_expired');
+  }
+
+  // Force users to change their password on first login
+  if (currentUser.needsPasswordChange) {
+    redirect('/change-password');
   }
 
   // Get partner information using the correct user ID

@@ -11,6 +11,8 @@ declare module "next-auth" {
     id?: string;
     name?: string | null;
     email?: string | null;
+    role?: string;
+    needsPasswordChange?: boolean;
   }
           
   interface Session {
@@ -18,6 +20,8 @@ declare module "next-auth" {
       id: string;
       name?: string | null;
       email: string;
+      role: string;
+      needsPasswordChange: boolean;
     }
   }
 }
@@ -55,13 +59,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             id: true,
             email: true,
             name: true,
-            password: true
+            password: true,
+            role: true,
+            needsPasswordChange: true
           }
         }) as {
           id: string;
           email: string;
           name: string | null;
           password: string | null;
+          role: string;
+          needsPasswordChange: boolean;
         } | null;
                         
         if (!user || !user.password) return null;
@@ -77,6 +85,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           id: user.id.toString(),
           email: user.email,
           name: user.name,
+          role: user.role,
+          needsPasswordChange: user.needsPasswordChange,
         } as User;
       },
     }),
@@ -93,6 +103,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
+        token.role = user.role;
+        token.needsPasswordChange = user.needsPasswordChange;
       }
       return token;
     },
@@ -103,6 +115,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = token.id as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
+        session.user.role = token.role as string;
+        session.user.needsPasswordChange = token.needsPasswordChange as boolean;
       }
       return session;
     },

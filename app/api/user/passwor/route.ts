@@ -1,55 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
+// app/api/user/passwor/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import * as UserService from "@/domains/user/service";
 
-export const runtime = 'nodejs'
-// app/api/user/password/route.ts
+export const runtime = "nodejs";
+
 export async function PUT(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const body = await request.json();
+    const { currentPassword, newPassword } = body;
 
-    const currentUser = await prisma.user.findUnique({ where: { email: session.user.email } })
-    if (!currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
+    await UserService.updatePassword({ currentPassword, newPassword });
 
-    const body = await request.json()
-    const { currentPassword, newPassword } = body
-
-    if (!currentPassword || !newPassword) {
-      return NextResponse.json({ error: 'Current and new passwords are required' }, { status: 400 })
-    }
-
-    if (newPassword.length < 8) {
-      return NextResponse.json({ error: 'New password must be at least 8 characters' }, { status: 400 })
-    }
-
-    // Get current user with password
-    const user = await prisma.user.findUnique({ where: { id: currentUser.id } })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Verify current password
-    const isValidPassword = await bcrypt.compare(currentPassword, user.password)
-    if (!isValidPassword) {
-      return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 })
-    }
-
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 12)
-
-    // Update password
-    await prisma.user.update({ where: { id: currentUser.id }, data: { password: hashedPassword } })
-
-    return NextResponse.json({ message: 'Password updated successfully' })
-  } catch (error) {
-    console.error('Error updating password:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ message: "Password updated successfully" });
+  } catch (error: any) {
+    console.error("Error updating password:", error);
+    const status =
+      error.message === "Not authenticated"
+        ? 401
+        : error.message === "User not found or no password set"
+        ? 404
+        : error.message === "Current and new passwords are required" ||
+          error.message === "New password must be at least 8 characters" ||
+          error.message === "Current password is incorrect"
+        ? 400
+        : 500;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }

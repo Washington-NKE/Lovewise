@@ -1,105 +1,55 @@
-// PUT /api/secret-plan-items/[id]
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+// app/api/secret-plan-item/[id]/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import * as SecretPlanService from "@/domains/secret-plan/service";
 
-export const runtime = 'nodejs'
+export const runtime = "nodejs";
 
-// Update a secret plan item
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { id } = await params;
+    const body = await request.json();
+    const { item, completed, cost, notes } = body;
 
-    const currentUser = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
+    const updatedItem = await SecretPlanService.updateSecretPlanItem(id, {
+      item,
+      completed,
+      cost,
+      notes,
+    });
 
-    if (!currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const { id } = await params
-    const body = await request.json()
-    const { item, completed, cost, notes } = body
-
-    const existingItem = await prisma.secretPlanItem.findUnique({
-      where: { id },
-      include: {
-        plan: {
-          select: { userId: true }
-        }
-      }
-    })
-
-    if (!existingItem || existingItem.plan.userId !== currentUser.id) {
-      return NextResponse.json({ error: 'Secret plan item not found' }, { status: 404 })
-    }
-
-    const updatedItem = await prisma.secretPlanItem.update({
-      where: { id },
-      data: {
-        item,
-        completed,
-        cost,
-        notes
-      }
-    })
-
-    return NextResponse.json(updatedItem)
-  } catch (error) {
-    console.error('Error updating secret plan item:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json(updatedItem);
+  } catch (error: any) {
+    console.error("Error updating secret plan item:", error);
+    const status =
+      error.message === "Not authenticated"
+        ? 401
+        : error.message === "Secret plan item not found"
+        ? 404
+        : 500;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }
 
-// DELETE /api/secret-plan-items/[id]
-// Delete a secret plan item
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { id } = await params;
 
-    const currentUser = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const { id } = await params
-
-    const existingItem = await prisma.secretPlanItem.findUnique({
-      where: { id },
-      include: {
-        plan: {
-          select: { userId: true }
-        }
-      }
-    })
-
-    if (!existingItem || existingItem.plan.userId !== currentUser.id) {
-      return NextResponse.json({ error: 'Secret plan item not found' }, { status: 404 })
-    }
-
-    await prisma.secretPlanItem.delete({
-      where: { id }
-    })
-
-    return NextResponse.json({ message: 'Secret plan item deleted successfully' })
-  } catch (error) {
-    console.error('Error deleting secret plan item:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    await SecretPlanService.deleteSecretPlanItem(id);
+    return NextResponse.json({ message: "Secret plan item deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting secret plan item:", error);
+    const status =
+      error.message === "Not authenticated"
+        ? 401
+        : error.message === "Secret plan item not found"
+        ? 404
+        : 500;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }

@@ -1,60 +1,43 @@
-
-import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-import {auth} from '@/lib/auth'
-
-const prisma = new PrismaClient()
+// app/api/presence/update/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import * as PresenceRepository from "@/domains/presence/repository";
+import * as RelationshipRepository from "@/domains/relationship/repository";
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
-    
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { userId, timestamp } = await request.json()
+    const { userId, timestamp } = await request.json();
 
-    // Verify the user is updating their own presence
     if (userId !== session.user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Update user's last active timestamp
-    await prisma.user.update({
-      where: { id: userId },
-      data: { lastActive: new Date(timestamp) }
-    })
+    await PresenceRepository.updateUserPresence(userId, new Date(timestamp));
 
-    // Get partner information for real-time updates
-    const relationship = await prisma.relationship.findFirst({
-      where: {
-        OR: [
-          { userId: userId, status: 'ACTIVE' },
-          { partnerId: userId, status: 'ACTIVE' }
-        ]
-      },
-      include: {
-        user: true,
-        partner: true
-      }
-    })
-
-    let partnerInfo = null
+    const relationship = await RelationshipRepository.findActiveRelationshipWithDetails(userId);
+    let partnerInfo = null;
     if (relationship) {
-      partnerInfo = relationship.userId === userId ? relationship.partner : relationship.user
+      const partner = relationship.userId === userId ? relationship.partner : relationship.user;
+      if (partner) {
+        partnerInfo = {
+          id: partner.id,
+          name: partner.name,
+          lastActive: partner.lastActive,
+        };
+      }
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      partner: partnerInfo ? {
-        id: partnerInfo.id,
-        name: partnerInfo.name,
-        lastActive: partnerInfo.lastActive
-      } : null
-    })
-  } catch (error) {
-    console.error('Error updating presence:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({
+      success: true,
+      partner: partnerInfo,
+    });
+  } catch (error: any) {
+    console.error("Error updating presence:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -42,6 +42,7 @@ import { usePartnerPresenceSimple } from "@/components/WebSocketPresenceProvider
 interface Session extends NextAuthSession {
   user: NextAuthSession["user"] & {
     image?: string | null
+    role?: string
   }
 }
 import { signOutAction } from "@/lib/actions/auth"
@@ -410,6 +411,18 @@ export const LoveJournalSidebar: React.FC<LoveJournalSidebarProps> = ({ session,
                     </SidebarLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                {session?.user?.role === "admin" && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname === "/admin" || pathname.startsWith("/admin")} className="hover:bg-rose-100/50 transition-all">
+                      <SidebarLink href="/admin" className="group">
+                        <motion.div whileHover={{ rotate: 5 }} className="flex items-center">
+                          <Settings className="h-5 w-5 text-rose-600 group-hover:text-rose-700 transition-colors" />
+                          <span className="text-rose-800 group-hover:text-rose-900 transition-colors">Admin Panel</span>
+                        </motion.div>
+                      </SidebarLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={pathname === "/dashboard/settings"} className="hover:bg-rose-100/50 transition-all">
                     <SidebarLink href="/dashboard/settings#relationship-invites" className="group">

@@ -1,30 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 // app/api/user/notifications/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import * as UserService from "@/domains/user/service";
+
 export async function PUT(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const body = await request.json();
+    const { email, push, reminders, partnerActivity } = body;
 
-    const body = await request.json()
-    const { email, push, reminders, partnerActivity } = body
+    await UserService.updateNotificationPreferences({
+      email,
+      push,
+      reminders,
+      partnerActivity,
+    });
 
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: {
-        emailNotifications: email,
-        pushNotifications: push,
-        eventReminders: reminders,
-        partnerActivityNotifications: partnerActivity,
-      }
-    })
-
-    return NextResponse.json({ message: 'Notification preferences updated' })
-  } catch (error) {
-    console.error('Error updating notifications:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ message: "Notification preferences updated" });
+  } catch (error: any) {
+    console.error("Error updating notifications:", error);
+    const status = error.message === "Not authenticated" ? 401 : 500;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }
