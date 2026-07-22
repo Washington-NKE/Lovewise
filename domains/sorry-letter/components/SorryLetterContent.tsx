@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, Sparkles, CheckCircle2 } from 'lucide-react';
+import {Volume2, VolumeX, Sparkles, CheckCircle2, Heart} from 'lucide-react';
 import { SorryAudioEngine } from './SorryAudioEngine';
 
 interface Spark {
@@ -55,7 +55,7 @@ const Polaroid: React.FC<PolaroidProps> = ({ title, shortDesc, revealText }) => 
           {/* Simulated photo slot */}
           <div className="w-full aspect-square bg-gradient-to-br from-[#2c0c16] to-[#0c0408] border border-rose-950/20 rounded-lg flex items-center justify-center relative overflow-hidden">
             <div className="absolute inset-0 bg-radial-gradient opacity-40" />
-            <Sparkles className="w-6 h-6 text-[#dfb15b]/40 animate-pulse" />
+            <Heart className="w-6 h-6 text-[#dfb15b]/40 animate-pulse" />
           </div>
           {/* Polaroid label */}
           <div className="pt-2.5 text-center">
@@ -213,7 +213,7 @@ export const SorryLetterContent: React.FC = () => {
             he truth is, we never really broke up. We just... <span className="text-[#ff4d6d] font-semibold">drifted apart</span>. We stopped talking as much. We stopped spending time together. We stopped going on dates. Life quietly placed distance between us until one day, we were no longer what we used to be. But despite all that, a part of me has never truly let go.
           </p>
           <p className="text-rose-100/80 font-light text-sm sm:text-base">
-            Meeting you remains one of the most unforgettable moments of my life. I still remember seeing you through the window, hearing your voice before I could properly see your face. You had this presence that immediately caught my attention. And when I finally saw you clearly, I remember thinking, <em className="italic font-serif text-[#dfb15b]">"Wow... she's beautiful."</em>
+            Meeting you remains one of the most unforgettable moments of my life. I still remember seeing you through the window huko lib, hearing your voice before I could properly see your face. You had this presence that immediately caught my attention. And when I finally saw you clearly, I remember thinking, <em className="italic font-serif text-[#dfb15b]">"Wow... she's beautiful."</em>
           </p>
           <p className="text-rose-100/80 font-light text-sm sm:text-base">
             Little did I know that the girl behind that smile would become someone who would leave such a permanent mark on my heart.
@@ -235,20 +235,25 @@ export const SorryLetterContent: React.FC = () => {
           {/* 3D Polaroids Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-lg mx-auto">
             <Polaroid 
-              title="St. Anne" 
+              title="St. Anne chronicals"
               shortDesc="Tap to reveal memory" 
-              revealText="We sat in the quiet, watching the world pass by. In those silent moments, I felt closer to you than ever before."
+              revealText="We sat in the quiet, touching each other as the world passed by. Tulikiss kwa hiyo library. In those moments, I felt closer to you than ever before."
             />
             <Polaroid 
-              title="Boda Rides" 
+              title="Boda Ride"
               shortDesc="Tap to reveal memory" 
-              revealText="Cold wind on our faces, but your arms wrapped around me was all the warmth I needed."
+              revealText="Cold wind on our faces, but my hand full of your tits was all the warmth I needed."
             />
             <Polaroid 
-              title="Soup Dates" 
+              title="Soup Date"
               shortDesc="Tap to reveal memory" 
-              revealText="Piping hot soup, cold weather, and your laugh echoing. Simple times that are now priceless memories."
+              revealText="Piping hot soup, you giving me clear signals. Iyo time nilikuwa sure unanipenda. Simple times that are now priceless memories."
             />
+            <Polaroid
+                title="cuerpo a cuerpo"
+                shortDesc="Tap to reveal memory"
+                revealText="Our sex moments are my most cherished ones as you know. But I'm not going to talk much about that. I miss your moaning."
+              />
           </div>
 
           <p className="text-rose-100/90 font-light text-sm sm:text-base max-w-xl mx-auto">
@@ -268,7 +273,7 @@ export const SorryLetterContent: React.FC = () => {
             Then life happened. More truthfully, <strong className="text-[#ff4d6d] font-bold">I happened.</strong>
           </p>
           <p className="text-rose-100/80 font-light text-sm sm:text-base">
-            I made mistakes. I hurt you. I failed to love you in the way you deserved to be loved. I was remorseful even then, but I didn't know how to show it, and that is something I regret deeply. Every time I think about what happened, there is still a quiet apology in my heart.
+            I made mistakes. I hurt you. I failed to love you in the way you deserved to be loved. I was remorseful even then, but I didn't know how to show it, and that is something I regret deeply. Every time I think about what happened, there is still a quiet apology in my heart. Najua huonangi kama ni ukweli but I always wish I'd have held you very close to me during that time.
           </p>
 
           <div className="font-serif italic border-l-2 border-[#dfb15b] pl-5 my-6 text-[#ebd09b] text-sm sm:text-base leading-relaxed bg-[#dfb15b]/5 py-4 pr-4 rounded-r-lg text-left">
@@ -280,7 +285,7 @@ export const SorryLetterContent: React.FC = () => {
             At first, that hurt to hear. But over time I've come to understand it. Some wounds don't disappear simply because someone says "I'm sorry." Betrayal leaves echoes, and healing has no deadline. I accept that now.
           </p>
           <p className="text-rose-100/80 font-light text-sm sm:text-base">
-            What I hope you never doubt is this: <strong>I loved you then, and I still love you now</strong>, even though life has carried us in different directions.
+            What I hope you never doubt is this: <strong>I loved you then, and I still love you now, nakupenda sana</strong>, even though life has carried us in different directions.
           </p>
         </motion.div>
 
@@ -296,7 +301,7 @@ export const SorryLetterContent: React.FC = () => {
             I decided to write because silence has never really answered anything. Maybe this letter changes nothing. Maybe it changes everything. Either way, these are words I needed to say.
           </p>
           <p className="text-rose-100/80 font-light text-sm sm:text-base">
-            Everything I ever told you about my life after us has been true. I haven't had another relationship since. There were moments of flirting, perhaps an attempt to distract myself from loneliness, but nothing meaningful, nothing that ever came close to what we had. Right now, my focus is on finishing my degree and rebuilding the man I want to become.
+            Everything I ever told you about my life after us has been true. I haven't had another relationship since. After kuachana na Risper tulidate nawewe for a few days. And haikuwork. So that's double heartbreaks in a short time frame. There were moments of flirting, perhaps an attempt to distract myself from loneliness, but nothing meaningful, nothing that ever came close to what we had. Right now, my focus is on finishing my degree and rebuilding the man I want to become.
           </p>
 
           <hr className="border-0 h-[1px] bg-rose-500/20 my-8" />
@@ -307,7 +312,7 @@ export const SorryLetterContent: React.FC = () => {
             Those words sound harsher than I intend them to, but honesty has always felt kinder than pretending. Perhaps it isn't really about you. Perhaps it's about fear.
           </p>
           <p className="text-[#f3e6d8]/75 font-light text-sm sm:text-base">
-            The last time I opened my heart to you, I was met with silence. Maybe you had your reasons—I don't know. But silence has a strange way of planting doubt in a person's heart.
+            The last time I opened my heart to you, I was met with silence. Maybe you had your reasons, I don't know. But silence has a strange way of planting doubt in a person's heart.
           </p>
         </motion.div>
 
@@ -354,7 +359,7 @@ export const SorryLetterContent: React.FC = () => {
           </div>
 
           <p className="text-rose-100/80 font-light text-sm sm:text-base">
-            Today reminded me that some emotions never really disappear. They simply wait for the right moment to remind you they're still there.
+            Today reminded me that some emotions never really disappear. They simply wait for the right moment to remind you they're still there. Nilikuwa nawish tu ungenihold uniambie you still love me too. You show me your nipples and tell me that they've missed my touch. But maybe naotanga sana.
           </p>
           <p className="text-rose-100/80 font-light text-sm sm:text-base">
             So yes... <strong className="text-[#ff4d6d] font-bold">I love you.</strong> But somewhere along the journey, fear found a place where trust once lived.
@@ -370,7 +375,7 @@ export const SorryLetterContent: React.FC = () => {
           className="border border-[#dfb15b]/15 bg-black/40 backdrop-blur-xl rounded-2xl p-6 sm:p-10 shadow-2xl max-w-xl mx-auto space-y-6"
         >
           <p className="font-serif italic text-sm text-[#dfb15b] tracking-wider uppercase">
-            Interactive: A Promise of Growth
+            Interactive: Ningepromise hizi
           </p>
           
           <div className="flex flex-col items-center justify-center py-4 relative">
@@ -409,7 +414,7 @@ export const SorryLetterContent: React.FC = () => {
             <p className="text-xs text-[#b39db0] text-center max-w-sm mt-4 font-light">
               {healed 
                 ? "The heart is patched with gold. Repair is a deliberate choice." 
-                : "Gather the 5 promises below to mend the cracked connection."}
+                : "Tap tap screen. Tap! tap!, tap! tap!."}
             </p>
           </div>
 
@@ -455,7 +460,7 @@ export const SorryLetterContent: React.FC = () => {
               >
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#dfb15b] to-transparent" />
                 <p className="font-serif italic text-xs text-[#dfb15b] leading-relaxed">
-                  "I promise to work on these steps every day, not just to repair what was broken, but to grow into the partner you deserved."
+                  "Ningepromise ku-work on these steps every day, not just to repair what was broken, but to grow into the partner you deserved. Anyways..."
                 </p>
               </motion.div>
             )}
@@ -471,10 +476,10 @@ export const SorryLetterContent: React.FC = () => {
           className="space-y-6 max-w-xl mx-auto"
         >
           <p className="text-rose-100/90 font-light text-sm sm:text-base">
-            If there is one thing I ask of you, it is this: <strong className="text-[#ff4d6d]">please forgive me</strong>—not only for what happened last year, but for every moment I've ever made you feel unloved, unimportant, disappointed, or burdened. Those memories weigh on me more than you probably know.
+            If there is one thing I ask of you, it is this: <strong className="text-[#ff4d6d]">please forgive me</strong>. Not only for what happened last year, but for every moment I've ever made you feel unloved, unimportant, disappointed, or burdened. Those memories weigh on me more than you probably know.
           </p>
           <p className="text-rose-100/80 font-light text-sm sm:text-base">
-            You are an extraordinary woman. You are beautiful, inside and out. Your smile has always been my favourite thing about you. It has a way of making everything around it feel lighter. You carried yourself with confidence, grace, and a spark that made you unforgettable.
+            You are an extraordinary girl. Unakuanga umeiva sana. You are beautiful, inside and out. Napenda figa yako. Your smile has always been my favourite thing about you. Your nipples too. The smile has a way of making everything around it feel lighter. You carried yourself with confidence, grace, and a spark that made you unforgettable.
           </p>
           <p className="text-rose-100/80 font-light text-sm sm:text-base">
             Sometimes I imagine the life we might have built together. Maybe we would have had beautiful children. Maybe I would have proudly introduced you to everyone I knew, grateful that someone as remarkable as you chose me. Maybe those dreams were never meant to happen.
@@ -494,7 +499,7 @@ export const SorryLetterContent: React.FC = () => {
             I've reached the end of this letter, not because I've run out of things to say, but because words eventually become too small for certain feelings.
           </p>
           <p className="text-rose-100/80 font-light text-sm sm:text-base">
-            If we had met today, perhaps I would have said all this in person. Since we couldn't, these pages will have to carry what my voice could not.
+            If we had met again ile time nilikucall, perhaps I would have said all this in person. Since we couldn't, these pages will have to carry what my voice could not.
           </p>
           <p className="text-rose-100/80 font-light text-sm sm:text-base">
             Thank you for every beautiful memory you gave me.<br />
@@ -516,7 +521,7 @@ export const SorryLetterContent: React.FC = () => {
         </motion.div>
 
         <p className="text-center text-[10px] tracking-widest text-[#b39db0]/35 font-serif pt-16">
-          ✨ tap anywhere on the page to leave glowing spark embers ✨
+          ✨ nakupenda sana. not only to have sex with you, or have you touch me, but you're a work of art and I love you! ✨
         </p>
 
       </div>

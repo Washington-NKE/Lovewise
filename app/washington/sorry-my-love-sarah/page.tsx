@@ -76,7 +76,7 @@ export default function SorrySarahPage() {
                 >
                   <div className="text-center pt-8 pb-4">
                     <h1 className="font-[family:var(--font-vibes)] text-6xl text-white drop-shadow-[0_0_20px_rgba(230,57,86,0.3)]">
-                      Sarah
+                      Sarah Sonie
                     </h1>
                     <p className="text-[10px] tracking-widest text-[#dfb15b] uppercase font-serif mt-1">
                       Always
@@ -96,7 +96,7 @@ export default function SorrySarahPage() {
             transition={{ delay: 1 }}
             className="text-center text-[10px] tracking-[3px] text-[#e8a6b8]/20 mt-auto select-none pointer-events-none font-serif"
           >
-            made with a quiet kind of love
+            Written by Washington with a quiet kind of love
           </motion.footer>
         </div>
       </main>
