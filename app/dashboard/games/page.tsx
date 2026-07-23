@@ -5,7 +5,7 @@ import React, {useState, useEffect} from 'react'
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Heart, Flame, Sparkles } from 'lucide-react'
+import { Heart, Flame, Sparkles, RefreshCw } from 'lucide-react'
 import { motion } from "framer-motion"
 import { CreateGameDialog } from '@/components/create-game-dialog'
 
@@ -41,7 +41,16 @@ const gamesPage = () => {
     fetchGames();
   }, []);
 
-  if (loading) return <div className="p-8">Loading games...</div>;
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-rose-50 via-white to-purple-50">
+        <div className="flex flex-col items-center gap-2">
+          <RefreshCw className="w-8 h-8 text-rose-500 animate-spin" />
+          <span className="text-sm text-gray-500 font-serif italic">Loading games...</span>
+        </div>
+      </div>
+    );
+  }
   if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
 
   const fadeInUp = {
@@ -94,78 +103,90 @@ const gamesPage = () => {
         </div>
       </div>
 
-      <motion.div
-        className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-        variants={staggerContainer}
-        initial="initial"
-        animate="animate"
-      >
-        {games.map((game, idx) => (
-          <motion.div
-            key={game.id}
-            variants={fadeInUp}
-            whileHover={hoverAnimation.whileHover}
-            className="group h-full"
-          >
-            <Card
-              className="h-full flex flex-col overflow-hidden border-rose-200/60 bg-white/70 backdrop-blur-md shadow-sm transition-all duration-300 group-hover:shadow-rose-200/60"
+      {games.length === 0 ? (
+        <Card className="border-rose-200/60 bg-white/70 backdrop-blur-md p-8 text-center max-w-md mx-auto">
+          <CardContent className="space-y-4 pt-6">
+            <Heart className="mx-auto h-12 w-12 text-rose-400 fill-rose-100" />
+            <h3 className="text-xl font-bold text-rose-900">No games created yet</h3>
+            <p className="text-sm text-rose-700/80">
+              Create your first customized romantic game using the button above!
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <motion.div
+          className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          variants={staggerContainer}
+          initial="initial"
+          animate="animate"
+        >
+          {games.map((game, idx) => (
+            <motion.div
+              key={game.id}
+              variants={fadeInUp}
+              whileHover={hoverAnimation.whileHover}
+              className="group h-full"
             >
-              {/* Animated romantic ribbon */}
-              <motion.div
-                className="h-1 w-full"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(90deg, #fb7185, #f472b6, #a78bfa, #fb7185)',
-                  backgroundSize: '200% 100%',
-                }}
-                animate={shimmerKeyframes.animate}
-              />
+              <Card
+                className="h-full flex flex-col overflow-hidden border-rose-200/60 bg-white/70 backdrop-blur-md shadow-sm transition-all duration-300 group-hover:shadow-rose-200/60"
+              >
+                {/* Animated romantic ribbon */}
+                <motion.div
+                  className="h-1 w-full"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(90deg, #fb7185, #f472b6, #a78bfa, #fb7185)',
+                    backgroundSize: '200% 100%',
+                  }}
+                  animate={shimmerKeyframes.animate}
+                />
 
-              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                <CardTitle className="text-lg font-semibold text-rose-800">
-                  {game.title}
-                </CardTitle>
-                <div className="flex items-center gap-2 text-rose-500">
-                  <Heart className="h-4 w-4" />
-                  <span className="text-xs">x{game.maxPlayers}</span>
-                </div>
-              </CardHeader>
+                <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                  <CardTitle className="text-lg font-semibold text-rose-800">
+                    {game.title}
+                  </CardTitle>
+                  <div className="flex items-center gap-2 text-rose-500">
+                    <Heart className="h-4 w-4" />
+                    <span className="text-xs">x{game.maxPlayers}</span>
+                  </div>
+                </CardHeader>
 
-              <CardContent className="flex-1 flex flex-col">
-                <p className="text-sm text-rose-700/80">
-                  {game.description}
-                </p>
+                <CardContent className="flex-1 flex flex-col">
+                  <p className="text-sm text-rose-700/80">
+                    {game.description}
+                  </p>
 
-                {/* bottom actions */}
-                <div className="mt-auto pt-4 flex items-center justify-between">
-                  <Link
-                    href={`/dashboard/games/${game.slug}`}
-                    className="text-sm font-medium text-fuchsia-700 hover:text-fuchsia-800 transition"
-                  >
-                    Explore
-                  </Link>
+                  {/* bottom actions */}
+                  <div className="mt-auto pt-4 flex items-center justify-between">
+                    <Link
+                      href={`/dashboard/games/${game.slug}`}
+                      className="text-sm font-medium text-fuchsia-700 hover:text-fuchsia-800 transition"
+                    >
+                      Explore
+                    </Link>
 
-                  <motion.div
-                    className="flex items-center gap-2 text-fuchsia-500"
-                    animate={{ opacity: [0.8, 1, 0.8], scale: [1, 1.08, 1] }}
-                    transition={{ duration: 2.5, repeat: Infinity }}
-                  >
-                    <Flame className="h-4 w-4" />
-                    <span className="text-xs">Feel the spark</span>
-                  </motion.div>
-                </div>
-              </CardContent>
+                    <motion.div
+                      className="flex items-center gap-2 text-fuchsia-500"
+                      animate={{ opacity: [0.8, 1, 0.8], scale: [1, 1.08, 1] }}
+                      transition={{ duration: 2.5, repeat: Infinity }}
+                    >
+                      <Flame className="h-4 w-4" />
+                      <span className="text-xs">Feel the spark</span>
+                    </motion.div>
+                  </div>
+                </CardContent>
 
-              {/* subtle floating glow */}
-              <motion.div
-                className="absolute bottom-6 right-6 h-16 w-16 rounded-full bg-gradient-to-t from-fuchsia-200 to-transparent opacity-40"
-                animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.6, 0.3] }}
-                transition={{ duration: 3, repeat: Infinity }}
-              />
-            </Card>
-          </motion.div>
-        ))}
-      </motion.div>
+                {/* subtle floating glow */}
+                <motion.div
+                  className="absolute bottom-6 right-6 h-16 w-16 rounded-full bg-gradient-to-t from-fuchsia-200 to-transparent opacity-40"
+                  animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.6, 0.3] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                />
+              </Card>
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
     </div>
   )
 }

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { toast} from 'sonner'
-import { Plus, Heart, Calendar, Lock, Bookmark, Eye, EyeOff, Sparkles, Loader2, Trash, MoreVertical, Edit, X } from 'lucide-react'
+import { Plus, Heart, Calendar, Lock, Bookmark, Eye, EyeOff, Sparkles, Loader2, Trash, MoreVertical, Edit, X, RefreshCw } from 'lucide-react'
 import { motion } from "framer-motion"
 import { 
   getJournalEntries, 
@@ -677,10 +677,10 @@ function JournalEntryGrid({
 }) {
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-pink-500 mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading your memories...</p>
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-rose-50 via-white to-purple-50">
+        <div className="flex flex-col items-center gap-2">
+          <RefreshCw className="w-8 h-8 text-rose-500 animate-spin" />
+          <span className="text-sm text-gray-500 font-serif italic">Loading your journal memories...</span>
         </div>
       </div>
     );

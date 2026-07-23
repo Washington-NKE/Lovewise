@@ -33,14 +33,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    if (!body.name) {
+    if (!body.name && !body.giftName) {
       return NextResponse.json({ error: "Gift name is required" }, { status: 400 });
     }
 
+    const partnerId = relationship.userId === user.id ? relationship.partnerId : relationship.userId;
+
     const gift = await GiftService.createGift({
       ...body,
+      name: body.name || body.giftName,
       giverId: body.giverId || user.id,
-      recipientId: body.recipientId || user.id,
+      recipientId: body.recipientId || partnerId,
       relationshipId: relationship.id,
     });
 

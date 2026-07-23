@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { RefreshCw } from 'lucide-react';
 
 interface Quiz {
     id: string;
@@ -44,8 +45,11 @@ export default function QuizPage() {
 
     if (loading) {
         return (
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+          <div className="flex h-screen items-center justify-center bg-gradient-to-br from-rose-50 via-white to-purple-50">
+            <div className="flex flex-col items-center gap-2">
+              <RefreshCw className="w-8 h-8 text-rose-500 animate-spin" />
+              <span className="text-sm text-gray-500 font-serif italic">Loading quizzes...</span>
+            </div>
           </div>
         );
     }

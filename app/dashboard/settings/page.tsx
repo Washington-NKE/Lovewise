@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, RefreshCw, Heart, HeartHandshake } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -66,6 +66,7 @@ function initials(name: string | null | undefined, email: string) {
 export default function SettingsPage() {
   const [user, setUser] = useState<ProfileUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("profile")
   const [saving, setSaving] = useState(false)
   const [updatingInvitations, setUpdatingInvitations] = useState(false)
 
@@ -89,6 +90,17 @@ export default function SettingsPage() {
   useEffect(() => {
     void loadInitialData()
   }, [])
+
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash === "#relationship-invites") {
+        setActiveTab("invites")
+      }
+    };
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
 
   useEffect(() => {
     if (!canSearchUsers) {
@@ -352,8 +364,11 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-rose-50 via-white to-purple-50">
+        <div className="flex flex-col items-center gap-2">
+          <RefreshCw className="w-8 h-8 text-rose-500 animate-spin" />
+          <span className="text-sm text-gray-500 font-serif italic">Loading settings...</span>
+        </div>
       </div>
     )
   }
@@ -373,9 +388,10 @@ export default function SettingsPage() {
         <p className="text-muted-foreground">Manage your account settings and preferences.</p>
       </div>
 
-      <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-4">
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="invites">Relationship Invites</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
@@ -423,11 +439,16 @@ export default function SettingsPage() {
               </Button>
             </CardFooter>
           </Card>
+        </TabsContent>
 
-          <Card id="relationship-invites">
+        <TabsContent value="invites" className="mt-6">
+          <Card id="relationship-invites" className="bg-gradient-to-br from-rose-50 via-pink-50 to-red-50 border-rose-200 dark:from-zinc-900 dark:to-zinc-950 dark:border-zinc-800 shadow-md">
             <CardHeader>
-              <CardTitle>Partner Connection</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-rose-900 flex items-center gap-2">
+                <HeartHandshake className="h-6 w-6 text-rose-500 fill-rose-100" />
+                Partner Connection
+              </CardTitle>
+              <CardDescription className="text-rose-800/70">
                 Search by name or email, send an invite in one click, and manage approvals.
               </CardDescription>
             </CardHeader>

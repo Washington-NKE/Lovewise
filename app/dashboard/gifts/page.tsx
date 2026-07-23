@@ -48,7 +48,8 @@ import {
   Camera, 
   DollarSign,
   Flame,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react'
 
 // Types
@@ -124,6 +125,19 @@ interface LoveLetter {
   userId: string
   createdAt: string
 }
+
+const mapDbGiftToUiGift = (dbGift: any): Gift => ({
+  id: dbGift.id,
+  giftName: dbGift.name || dbGift.giftName || "",
+  date: dbGift.dateGiven ? new Date(dbGift.dateGiven).toISOString().split('T')[0] : (dbGift.date || ""),
+  occasion: dbGift.occasion || "",
+  description: dbGift.description || "",
+  reaction: dbGift.reaction || "",
+  image: dbGift.imageUrl || dbGift.image || "",
+  favorite: dbGift.isFavorite || dbGift.favorite || false,
+  giverId: dbGift.giverId,
+  recipientId: dbGift.recipientId
+})
 
 export default function GiftsPage() {
   const { theme } = useTheme()
@@ -227,7 +241,7 @@ export default function GiftsPage() {
       const response = await fetch('/api/gifts')
       if (response.ok) {
         const data = await response.json()
-        setGifts(data)
+        setGifts(Array.isArray(data) ? data.map(mapDbGiftToUiGift) : [])
       }
     } catch (error) {
       console.error('Error loading gifts:', error)
@@ -315,13 +329,13 @@ export default function GiftsPage() {
         body: JSON.stringify({
           ...newGift,
           giverId: session.user.id,
-          recipientId: newGift.recipientId || session.user.id
+          recipientId: newGift.recipientId || ""
         }),
       })
 
       if (response.ok) {
         const gift = await response.json()
-        setGifts(prev => [...prev, gift])
+        setGifts(prev => [...prev, mapDbGiftToUiGift(gift)])
         setNewGift({
           giftName: "",
           date: "",
@@ -534,14 +548,13 @@ export default function GiftsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...gift,
-          favorite: !gift.favorite
+          isFavorite: !gift.favorite
         }),
       })
 
       if (response.ok) {
         const updatedGift = await response.json()
-        setGifts(prev => prev.map(g => g.id === giftId ? updatedGift : g))
+        setGifts(prev => prev.map(g => g.id === giftId ? mapDbGiftToUiGift(updatedGift) : g))
       }
     } catch (error) {
       console.error('Error updating gift favorite:', error)
@@ -665,8 +678,11 @@ export default function GiftsPage() {
   // Show loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-rose-50 via-white to-purple-50">
+        <div className="flex flex-col items-center gap-2">
+          <RefreshCw className="w-8 h-8 text-rose-500 animate-spin" />
+          <span className="text-sm text-gray-500 font-serif italic">Loading gifts...</span>
+        </div>
       </div>
     )
   }
@@ -688,7 +704,9 @@ export default function GiftsPage() {
     footer: isDark ? "border-purple-800 bg-zinc-800/50" : "border-pink-200 bg-white/50",
     title: isDark ? "text-purple-50" : "text-pink-900",
     tabs: isDark ? "bg-zinc-800" : "bg-white",
-    tabSelected: isDark ? "bg-purple-700 text-white" : "bg-pink-500 text-white",
+    tabSelected: isDark 
+      ? "data-[state=active]:bg-purple-700 data-[state=active]:text-white text-purple-300 hover:text-purple-100" 
+      : "data-[state=active]:bg-pink-500 data-[state=active]:text-white text-pink-700 hover:text-pink-900",
     tabList: isDark ? "bg-zinc-700" : "bg-pink-100",
     flame: isDark ? "text-purple-500" : "text-pink-500",
     divider: isDark ? "border-purple-700" : "border-pink-200",
@@ -707,23 +725,23 @@ export default function GiftsPage() {
 
       <Tabs defaultValue="history" className="w-full">
         <TabsList className={`w-full justify-start mb-6 ${themeStyles.tabList}`}>
-          <TabsTrigger value="history" className={`data-[state=active]:${themeStyles.tabSelected}`}>
+          <TabsTrigger value="history" className={themeStyles.tabSelected}>
             Gift History
           </TabsTrigger>
-          <TabsTrigger value="wishlist" className={`data-[state=active]:${themeStyles.tabSelected}`}>
+          <TabsTrigger value="wishlist" className={themeStyles.tabSelected}>
             Wishlist
           </TabsTrigger>
-          <TabsTrigger value="occasions" className={`data-[state=active]:${themeStyles.tabSelected}`}>
+          <TabsTrigger value="occasions" className={themeStyles.tabSelected}>
             Special Occasions
           </TabsTrigger>
-          <TabsTrigger value="ideas" className={`data-[state=active]:${themeStyles.tabSelected}`}>
+          <TabsTrigger value="ideas" className={themeStyles.tabSelected}>
             Thoughtful Ideas
           </TabsTrigger>
-          <TabsTrigger value="secret" className={`data-[state=active]:${themeStyles.tabSelected}`}>
+          <TabsTrigger value="secret" className={themeStyles.tabSelected}>
             <LockIcon className="mr-1 h-3 w-3" />
             Secret Plans
           </TabsTrigger>
-          <TabsTrigger value="favorites" className={`data-[state=active]:${themeStyles.tabSelected}`}>
+          <TabsTrigger value="favorites" className={themeStyles.tabSelected}>
             <Heart className="mr-1 h-3 w-3" />
             Favorites
           </TabsTrigger>
@@ -731,6 +749,17 @@ export default function GiftsPage() {
 
         {/* Gift History Tab */}
         <TabsContent value="history" className="space-y-4">
+          {gifts.length === 0 && (
+            <Card className={themeStyles.card}>
+              <CardContent className="text-center py-8">
+                <Gift className={`mx-auto h-12 w-12 mb-4 ${themeStyles.flame}`} />
+                <p className={`text-lg font-medium ${themeStyles.title}`}>No gift memories yet</p>
+                <p className={themeStyles.secondary}>
+                  Record your first gift memory below!
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {gifts.map(gift => (
               <Card key={gift.id} className={`${themeStyles.card} ${themeStyles.cardHover} transition-all`}>
@@ -875,6 +904,17 @@ export default function GiftsPage() {
 
         {/* Wishlist Tab */}
         <TabsContent value="wishlist" className="space-y-4">
+          {wishlistItems.length === 0 && (
+            <Card className={themeStyles.card}>
+              <CardContent className="text-center py-8">
+                <Gift className={`mx-auto h-12 w-12 mb-4 ${themeStyles.flame}`} />
+                <p className={`text-lg font-medium ${themeStyles.title}`}>No wishlist items yet</p>
+                <p className={themeStyles.secondary}>
+                  Add items you would love to receive below!
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {wishlistItems.map(item => (
               <Card key={item.id} className={`${themeStyles.card} ${themeStyles.cardHover} transition-all`}>
@@ -1002,6 +1042,17 @@ export default function GiftsPage() {
 
         {/* Special Occasions Tab */}
         <TabsContent value="occasions" className="space-y-4">
+          {occasions.length === 0 && (
+            <Card className={themeStyles.card}>
+              <CardContent className="text-center py-8">
+                <Gift className={`mx-auto h-12 w-12 mb-4 ${themeStyles.flame}`} />
+                <p className={`text-lg font-medium ${themeStyles.title}`}>No special occasions registered yet</p>
+                <p className={themeStyles.secondary}>
+                  Add special upcoming dates below to track them!
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {occasions.map(occasion => (
               <Card key={occasion.id} className={`${themeStyles.card} ${themeStyles.cardHover} transition-all`}>
@@ -1127,6 +1178,17 @@ export default function GiftsPage() {
 
         {/* Thoughtful Ideas Tab */}
         <TabsContent value="ideas" className="space-y-4">
+          {thoughtfulIdeas.length === 0 && (
+            <Card className={themeStyles.card}>
+              <CardContent className="text-center py-8">
+                <Sparkles className={`mx-auto h-12 w-12 mb-4 ${themeStyles.flame}`} />
+                <p className={`text-lg font-medium ${themeStyles.title}`}>No thoughtful ideas yet</p>
+                <p className={themeStyles.secondary}>
+                  Jot down meaningful experiences or gift ideas below!
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {thoughtfulIdeas.map(idea => (
               <Card key={idea.id} className={`${themeStyles.card} ${themeStyles.cardHover} transition-all`}>
@@ -1243,6 +1305,17 @@ export default function GiftsPage() {
 
         {/* Secret Plans Tab */}
         <TabsContent value="secret" className="space-y-4">
+          {secretPlans.length === 0 && (
+            <Card className={themeStyles.card}>
+              <CardContent className="text-center py-8">
+                <LockIcon className={`mx-auto h-12 w-12 mb-4 ${themeStyles.flame}`} />
+                <p className={`text-lg font-medium ${themeStyles.title}`}>No secret plans yet</p>
+                <p className={themeStyles.secondary}>
+                  Plan a sweet surprise for your partner in secret below!
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {secretPlans.map(plan => (
               <Card key={plan.id} className={`${themeStyles.card} ${themeStyles.cardHover} transition-all`}>

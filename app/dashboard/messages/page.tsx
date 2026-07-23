@@ -16,7 +16,7 @@ import {Textarea} from "@/components/ui/textarea"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Send, Clock, Heart, Check, CheckCheck, AlertCircle, Calendar as CalendarIcon } from 'lucide-react'
+import { Send, Clock, Heart, Check, CheckCheck, AlertCircle, Calendar as CalendarIcon, RefreshCw } from 'lucide-react'
 import { useTheme } from "next-themes"
 import { format } from "date-fns"
 
@@ -390,6 +390,19 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Poll messages as fallback if websocket is not connected
+  useEffect(() => {
+    if (isConnected) return;
+    
+    const interval = setInterval(() => {
+      if (relationship?.id) {
+        loadMessages(relationship.id);
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [isConnected, relationship?.id, loadMessages]);
+
   // Handle Enter key
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -453,10 +466,10 @@ export default function MessagesPage() {
 
   if (isLoading) {
     return (
-      <div className={`flex h-[calc(100vh-8rem)] items-center justify-center ${themeStyles.background}`}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
-          <p className={themeStyles.title}>Loading messages...</p>
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-rose-50 via-white to-purple-50">
+        <div className="flex flex-col items-center gap-2">
+          <RefreshCw className="w-8 h-8 text-rose-500 animate-spin" />
+          <span className="text-sm text-gray-500 font-serif italic">Loading messages...</span>
         </div>
       </div>
     )
@@ -753,7 +766,6 @@ export default function MessagesPage() {
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyDown={handleKeyDown}
                     className={`flex-1 ${themeStyles.input}`}
-                    disabled={!isConnected}
                     onClick={() => {
                       setShowEmojiPicker(false)
                       setShowGifPicker(false)
@@ -763,7 +775,7 @@ export default function MessagesPage() {
                     size="icon" 
                     onClick={handleSendMessage} 
                     className={themeStyles.button}
-                    disabled={!newMessage.trim() || !isConnected}
+                    disabled={!newMessage.trim()}
                   >
                     <Send className="h-4 w-4" />
                   </Button>

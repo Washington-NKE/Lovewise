@@ -33,7 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Heart, Plus, Camera, Star, Bookmark, Clock, Film, Image, Sparkles, Upload, X, Loader2, Edit, Trash2, MoreVertical } from 'lucide-react'
+import { Heart, Plus, Camera, Star, Bookmark, Clock, Film, Image, Sparkles, Upload, X, Loader2, Edit, Trash2, MoreVertical, RefreshCw } from 'lucide-react'
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from 'sonner'
 
@@ -172,9 +172,11 @@ export default function MemoriesPage() {
   // Show loading state
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
-        <p className="mt-2 text-gray-600">Loading your relationship...</p>
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-rose-50 via-white to-purple-50">
+        <div className="flex flex-col items-center gap-2">
+          <RefreshCw className="w-8 h-8 text-rose-500 animate-spin" />
+          <span className="text-sm text-gray-500 font-serif italic">Loading memories...</span>
+        </div>
       </div>
     );
   }
@@ -666,6 +668,17 @@ export default function MemoriesPage() {
         </TabsList>
         
         <TabsContent value="all">
+          {memories.length === 0 && (
+            <Card className="border-pink-200 bg-white p-8 text-center max-w-md mx-auto my-6">
+              <CardContent className="space-y-4">
+                <Image className="mx-auto h-12 w-12 text-pink-400" />
+                <h3 className="text-xl font-bold text-pink-900">No memories yet</h3>
+                <p className="text-sm text-pink-700/80">
+                  Upload your first sweet photo or memory using the creator above!
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <motion.div 
             className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
             variants={containerVariants}
@@ -757,6 +770,17 @@ export default function MemoriesPage() {
         </TabsContent>
         
         <TabsContent value="favorites">
+          {memories.filter(memory => memory.isFavorite).length === 0 && (
+            <Card className="border-pink-200 bg-white p-8 text-center max-w-md mx-auto my-6">
+              <CardContent className="space-y-4">
+                <Star className="mx-auto h-12 w-12 text-pink-400 fill-pink-100" />
+                <h3 className="text-xl font-bold text-pink-900">No favorites yet</h3>
+                <p className="text-sm text-pink-700/80">
+                  Star your best moments to see them listed here!
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <motion.div 
             className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
             variants={containerVariants}
@@ -850,6 +874,17 @@ export default function MemoriesPage() {
         </TabsContent>
 
         <TabsContent value="saved">
+          {memories.filter(memory => memory.isSaved).length === 0 && (
+            <Card className="border-pink-200 bg-white p-8 text-center max-w-md mx-auto my-6">
+              <CardContent className="space-y-4">
+                <Bookmark className="mx-auto h-12 w-12 text-pink-400 fill-pink-100" />
+                <h3 className="text-xl font-bold text-pink-900">No saved memories yet</h3>
+                <p className="text-sm text-pink-700/80">
+                  Bookmark memories that you'd like to revisit!
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <motion.div 
             className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
             variants={containerVariants}
@@ -944,6 +979,17 @@ export default function MemoriesPage() {
 
         {albums.map(album => (
           <TabsContent key={album} value={album}>
+            {memories.filter(memory => memory.album === album).length === 0 && (
+              <Card className="border-pink-200 bg-white p-8 text-center max-w-md mx-auto my-6">
+                <CardContent className="space-y-4">
+                  <Image className="mx-auto h-12 w-12 text-pink-400" />
+                  <h3 className="text-xl font-bold text-pink-900">No memories in this album</h3>
+                  <p className="text-sm text-pink-700/80">
+                    Add some sweet memories to the "{album}" album to see them here!
+                  </p>
+                </CardContent>
+              </Card>
+            )}
             <motion.div 
               className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
               variants={containerVariants}

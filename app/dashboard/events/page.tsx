@@ -422,22 +422,52 @@ export default function EventsPage() {
         </TabsList>
         
         <TabsContent value="upcoming" className="mt-6">
-          <motion.div 
-            className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-          >
-            {events.map((event) => (
-              <EventCard 
-                key={event.id} 
-                event={event} 
-                isHovered={hoveredCard === event.id}
-                onHover={() => setHoveredCard(event.id)}
-                onLeave={() => setHoveredCard(null)}
-              />
-            ))}
-          </motion.div>
+          {events.length > 0 ? (
+            <motion.div 
+              className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+            >
+              {events.map((event) => (
+                <EventCard 
+                  key={event.id} 
+                  event={event} 
+                  isHovered={hoveredCard === event.id}
+                  onHover={() => setHoveredCard(event.id)}
+                  onLeave={() => setHoveredCard(null)}
+                />
+              ))}
+            </motion.div>
+          ) : (
+            <motion.div 
+              className="flex items-center justify-center p-12 text-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="space-y-4">
+                <motion.div 
+                  className="w-20 h-20 mx-auto bg-pink-100 dark:bg-pink-900 rounded-full flex items-center justify-center"
+                  animate={{ 
+                    scale: [1, 1.1, 1],
+                    rotate: [0, 5, -5, 0] 
+                  }}
+                  transition={{ 
+                    duration: 4,
+                    repeat: Infinity,
+                    repeatType: "reverse"
+                  }}
+                >
+                  <Heart className="h-10 w-10 text-pink-500" />
+                </motion.div>
+                <h3 className="text-xl font-medium text-pink-700 dark:text-pink-300">No upcoming moments planned yet</h3>
+                <p className="text-sm text-pink-500">
+                  Plan a romantic special date or memory using the button above!
+                </p>
+              </div>
+            </motion.div>
+          )}
         </TabsContent>
         
         <TabsContent value="past" className="mt-6">
